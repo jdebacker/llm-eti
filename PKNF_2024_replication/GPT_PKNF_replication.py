@@ -186,17 +186,17 @@ for i in range(NUM_SIMS):
     num_treatments = 5
     treatment_assignment = np.random.choice(num_treatments) + 1
     if i < np.ceil(NUM_SIMS / 4):  # control group
-                rate1 = tax_parameterizations["rate1"][0]
-                rate2 = tax_parameterizations["rate2"][0]
-            elif i < np.ceil(2 * NUM_SIMS / 4):  # treatment 1
-                rate1 = tax_parameterizations["rate1"][1]
-                rate2 = tax_parameterizations["rate2"][1]
-            elif i < np.ceil(3 * NUM_SIMS / 4):  # treatment 2
-                rate1 = tax_parameterizations["rate1"][2]
-                rate2 = tax_parameterizations["rate2"][2]
-            else:  # this is treatment that started with flat and switched to progressive
-                rate1 = tax_parameterizations["rate1"][0]
-                rate2 = tax_parameterizations["rate2"][0]
+        rate1 = tax_parameterizations["rate1"][0]
+        rate2 = tax_parameterizations["rate2"][0]
+    elif i < np.ceil(2 * NUM_SIMS / 4):  # treatment 1
+        rate1 = tax_parameterizations["rate1"][1]
+        rate2 = tax_parameterizations["rate2"][1]
+    elif i < np.ceil(3 * NUM_SIMS / 4):  # treatment 2
+        rate1 = tax_parameterizations["rate1"][2]
+        rate2 = tax_parameterizations["rate2"][2]
+    else:  # this is treatment that started with flat and switched to progressive
+        rate1 = tax_parameterizations["rate1"][0]
+        rate2 = tax_parameterizations["rate2"][0]
     if treatment_assignment == 4:  # treatment that starts with flat tax of 25%
         rate1 = tax_parameterizations["rate1"][1]
         rate2 = tax_parameterizations["rate2"][1]

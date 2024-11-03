@@ -200,7 +200,9 @@ for i in range(NUM_SIMS):
     if treatment_assignment == 4:  # treatment that starts with flat tax of 25%
         rate1 = tax_parameterizations["rate1"][1]
         rate2 = tax_parameterizations["rate2"][1]
-    elif treatment_assignment == 5:  # treatment that starts with flat tax of 50%
+    elif (
+        treatment_assignment == 5
+    ):  # treatment that starts with flat tax of 50%
         rate1 = tax_parameterizations["rate1"][2]
         rate2 = tax_parameterizations["rate2"][2]
     else:  # all other treatments start with progressive tax
@@ -286,3 +288,6 @@ df = pd.DataFrame(
 # Save results to disk as CSV and DataFrame via pickle
 df.to_csv(os.path.join("..", "data", DATA_FILENAME + ".csv"))
 pickle.dump(df, open(os.path.join("..", "data", DATA_FILENAME + ".pkl"), "wb"))
+
+# %%
+#

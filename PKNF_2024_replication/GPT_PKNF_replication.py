@@ -33,14 +33,14 @@ else:  # if file not exist, prompt user for token
 # Set OpenAI API key
 client = OpenAI(api_key=API_KEY)  # Chatgpt model
 # define file name (a string, path and extension set below)
-DATA_FILENAME = "PKNF_replication_results"
+DATA_FILENAME = "PKNF_replication_results_gpt-4o-mini"
 # make sure the data directory exists
 if not os.path.exists(os.path.join("..", "data")):
     os.makedirs(os.path.join("..", "data"))
-# Set number of observations to get from GPT-3.5
+# Set number of observations to get from GPT
 R = 16  # number of rounds in the tax simulation
 R_SWITCH = 8  # round number where switch tax regime
-NUM_SIMS = 20  # this will be number of sims, each sim has R rounds
+NUM_SIMS = 1000  # this will be number of sims, each sim has R rounds
 
 
 instructions_text = (
@@ -184,17 +184,20 @@ obs = 0
 for i in range(NUM_SIMS):
     # Assign 1/5 of sims to each of 5 treatments
     num_treatments = 5
-    treatment_assignment = np.random.choice(num_treatments) + 1
     if i < np.ceil(NUM_SIMS / 4):  # control group
+        treatment_assignment = 1
         rate1 = tax_parameterizations["rate1"][0]
         rate2 = tax_parameterizations["rate2"][0]
-    elif i < np.ceil(2 * NUM_SIMS / 4):  # treatment 1
+    elif i < np.ceil(2 * NUM_SIMS / 4):  # treatment 2
+        treatment_assignment = 2
         rate1 = tax_parameterizations["rate1"][1]
         rate2 = tax_parameterizations["rate2"][1]
-    elif i < np.ceil(3 * NUM_SIMS / 4):  # treatment 2
+    elif i < np.ceil(3 * NUM_SIMS / 4):  # treatment 3
+        treatment_assignment = 3
         rate1 = tax_parameterizations["rate1"][2]
         rate2 = tax_parameterizations["rate2"][2]
     else:  # this is treatment that started with flat and switched to progressive
+        treatment_assignment = np.random.choice([4, 5])
         rate1 = tax_parameterizations["rate1"][0]
         rate2 = tax_parameterizations["rate2"][0]
     if treatment_assignment == 4:  # treatment that starts with flat tax of 25%
@@ -229,7 +232,7 @@ for i in range(NUM_SIMS):
         sim_text = tax_sim(rate1, rate2, max_labor, round_number=j + 1)
         # get response from GPT-3.5
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o-mini", #"gpt-3.5-turbo",
             temperature=1.0,
             messages=[
                 {"role": "system", "content": instructions_text},

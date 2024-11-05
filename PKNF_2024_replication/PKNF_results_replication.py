@@ -7,6 +7,9 @@ import os
 import pickle
 import plotly.express as px
 
+# get directory of current file
+CUR_DIR = os.path.dirname(os.path.realpath(__file__))
+
 # set plotly to use white theme
 px.defaults.template = "plotly_white"
 
@@ -14,7 +17,7 @@ px.defaults.template = "plotly_white"
 # Read in data
 DATA_FILENAME = "PKNF_replication_results"
 df = pickle.load(
-    open(os.path.join("..", "data", DATA_FILENAME + ".pkl"), "rb")
+    open(os.path.join(CUR_DIR, "..", "data", DATA_FILENAME + ".pkl"), "rb")
 )
 
 # %%
@@ -52,6 +55,10 @@ treat_dict = {
     4: "Flat25,Prog",
 }
 table5["Treatment"] = table5["Treatment"].map(treat_dict)
+# Format decimals
+
+# Save as markdown
+table5.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table5.md"), floatfmt=".2f", index=False)
 # TODO: add p-value for test of diffs in means
 
 # %%
@@ -66,7 +73,9 @@ df_bar = (
 )
 # update treatment to be more descriptive
 df_bar["Treatment"] = df_bar["treatment"].map(treat_dict)
+treat_num = 0
 for treat in df_bar["Treatment"].unique():
+    treat_num += 1
     fig = px.bar(
         df_bar[df_bar["Treatment"] == treat],
         x="max_labor",
@@ -78,7 +87,7 @@ for treat in df_bar["Treatment"].unique():
     # Specify the x- and y-axis labels
     fig.update_xaxes(title_text="Maximum Labor")
     fig.update_yaxes(title_text="Labor Supply, in Units")
-    fig.show()
+    fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_Fig2_{treat_num}.png"))
 
 # %%
 # Figure 4
@@ -105,19 +114,23 @@ fig.update_yaxes(title_text="Labor Supply in %")
 # put a vertical dashed line at period 8
 fig.add_vline(x=8, line_dash="dash")
 fig.show()
+fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_Fig4.png"))
 
 # %%
 # Regression results
+
+PKNF_Table6_Col1 = [
+    -0.007, "(0.006)", -0.052, "(0.022)", 0.083, "(0.009)", 0.947, "(0.055)", 3344, 0.035
+]
+
 # labor = constant  + post + treat + post*treat
 # Table 6
 # Create a post-treatment interaction variable
 df["treated"] = df["treatment"] > 1
 df["post_treat"] = df["Post"] * df["treated"]
 df["Treatment"] = df["treatment"].map(treat_dict)
-reg_results_dict = {
-
-}
-for treat in df_bar["Treatment"].unique():
+reg_results_dict = {}
+for treat in df["Treatment"].unique():
     # Keep the treatment and control
     df_reg = df[(df["Treatment"] == treat) | (df["treated"] == 1)]
     # specify an indicator for the treated group
@@ -126,10 +139,39 @@ for treat in df_bar["Treatment"].unique():
     model = smf.ols('lab_supply ~ Post + treated_group + post_treat', data=df_reg)
     # Estimate the model
     results = model.fit()
-    print(results.summary())
-    # reg_results_dict[treat] = results.params[:]
-    # results.bse[:]  # std errors
-    # reg_results_dict[treat] = np.extend(reg_results_dict[treat], results.obs, results.rsquared)
+    reg_results_dict[treat] = [] # initialize list to store results
+    reg_results_dict[treat].append(f"{results.params["Post[T.True]"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["Post[T.True]"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["treated_group"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["treated_group"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["post_treat[T.True]"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["post_treat[T.True]"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["Intercept"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["Intercept"]:.3f})")
+    # for i, val in enumerate(results.params):
+    #     reg_results_dict[treat].append(f"{val:.3f}")
+    #     reg_results_dict[treat].append(f"({results.bse[i]:.3f})")
+    reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
+# put into dataframe
+reg_results = pd.DataFrame(reg_results_dict)
+reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+# Save as markdown
+reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table6.md"), index=True)
+
+# Make table comparing to PKNF results to LLM results
+compare_reg_dict = {
+    "PKNF": PKNF_Table6_Col1,
+    "LLM": reg_results["Prog,Flat25"]
+}
+reg_results = pd.DataFrame(compare_reg_dict)
+reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+# Save as markdown
+reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table6_compare.md"), index=True)
+
+
 
 # %% Use
 # Use regression model to estimate the ETI
+# do regression as above, but with log income as the dependent variable
+# then tax coefficient on the DD and divide by the change in (1-tau)
+# e.g. for the Prog,Flat25 group, this is (0.5 - 0.25)

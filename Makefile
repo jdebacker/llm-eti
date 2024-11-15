@@ -24,5 +24,17 @@ run-simulation-high-income:
 run-simulation-4o:
 	python cli.py run-simulation --model gpt-4o
 
+.PHONY: run-4o analyze-both
+
+run-4o:
+	python cli.py run-simulation \
+		--model gpt-4o \
+		--output simulation_4o
+
+analyze-both:
+	python combine_analyze.py \
+		results/simulation_20241105_143622 \
+		results/simulation_4o
+
 clean:
 	rm -rf results/*

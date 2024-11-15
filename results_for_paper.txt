@@ -1,0 +1,93 @@
+<documents>
+
+# Key Files and Results for ETI Analysis
+
+
+## File Structure
+- combined_results.csv
+- eti_by_income.png
+- eti_by_income_model.png
+- eti_by_mtr_model.png
+- eti_by_tax_direction.png
+- eti_distribution.png
+- model_comparison_summary.json
+- regression_table.tex
+- response_rate.png
+- summary_stats.csv
+
+## Main Regression Table
+<document>
+<source>regression_table.tex</source>
+<document_content>
+\begin{table}[!htbp] \centering
+  \caption{Simulated Elasticity of Taxable Income by Model}
+\begin{tabular}{lcc}
+\\[-1.8ex]\hline
+\hline \\[-1.8ex]
+ & GPT-4o & GPT-4o-mini \\
+\hline \\[-1.8ex]
+\multicolumn{3}{l}{\textbf{Panel A: Summary Statistics}} \\
+\\[-1.8ex]
+Mean ETI & $0.364$ & $1.280$ \\
+Median ETI & $-0.000$ & $1.140$ \\
+Share with no response & 80.5% & 3.1% \\
+Standard deviation & 2.534 & 0.756 \\
+25th percentile ETI & $0.000$ & $0.833$ \\
+75th percentile ETI & $0.000$ & $1.667$ \\
+Number of responses & 15,985 & 15,999 \\
+\\[-1.8ex]
+\multicolumn{3}{l}{\textbf{Panel B: Regression Coefficients}} \\
+\\[-1.8ex]
+Constant & $0.440^{***}$ \\ (0.056) & $1.224^{***}$ \\ (0.017) \\
+Income (\$100k) & $-0.061^{*}$ \\ (0.034) & $0.045^{***}$ \\ (0.014) \\
+MTR Change & $-6.797^{***}$ \\ (0.941) & $0.671^{***}$ \\ (0.210) \\
+Income $\times$ MTR & $1.123^{**}$ \\ (0.569) & $0.934^{***}$ \\ (0.168) \\
+$R^2$ & 0.020 & 0.028 \\
+\hline
+\hline \\[-1.8ex]
+\multicolumn{3}{p{0.95\linewidth}}{\textit{Notes:} 
+Heteroskedasticity-robust standard errors in parentheses. 
+The empirical literature typically finds average elasticities of taxable income (ETI) around 0.2-0.3, 
+with substantial shares of taxpayers not responding to tax changes due to optimization frictions. 
+GPT-4o's predictions align more closely with these empirical patterns, generating a mean ETI of 0.36 
+compared to 1.28 from GPT-4o-mini, and showing more non-response 
+(81% vs. 3%). 
+Panel B reports coefficients from regressions of ETI on income (in \$100k), marginal tax rate changes (in percentage points), 
+and their interaction. The low $R^2$ values indicate substantial heterogeneity in responses beyond these systematic patterns.} \\
+\multicolumn{3}{r}{$^{***}p<0.01$, $^{**}p<0.05$, $^{*}p<0.1$} \\
+\end{tabular}
+\end{table}
+</document_content>
+</document>
+
+## Summary Statistics
+<document>
+<source>summary_stats.csv</source>
+<document_content>
+         model      N  Mean ETI  Median ETI  Std ETI  Share No Response  P25 ETI  P75 ETI
+0       gpt-4o  15985    0.3638     -0.0000   2.5342             0.8051   0.0000   0.0000
+1  gpt-4o-mini  15999    1.2800      1.1404   0.7561             0.0311   0.8333   1.6667
+</document_content>
+</document>
+
+## Raw Data Preview
+<document>
+<source>combined_results.csv</source>
+<document_content>
+             timestamp  broad_income  prior_taxable_income  prior_rate  new_rate  response_number raw_response  parsed_income  implied_eti        model  mtr_change
+0  2024-11-05 14:36:22         50000               37500.0        0.25      0.15                1      $42,500        42500.0          1.0  gpt-4o-mini        -0.1
+1  2024-11-05 14:36:22         50000               37500.0        0.25      0.15                2      $42,500        42500.0          1.0  gpt-4o-mini        -0.1
+2  2024-11-05 14:36:22         50000               37500.0        0.25      0.15                3      $40,000        40000.0          0.5  gpt-4o-mini        -0.1
+3  2024-11-05 14:36:22         50000               37500.0        0.25      0.15                4      $42,500        42500.0          1.0  gpt-4o-mini        -0.1
+4  2024-11-05 14:36:22         50000               37500.0        0.25      0.15                5      $42,500        42500.0          1.0  gpt-4o-mini        -0.1
+</document_content>
+</document>
+
+## Generated Plots
+- eti_by_income_model.png
+- eti_by_mtr_model.png
+- eti_by_tax_direction.png
+- eti_by_income.png
+- eti_distribution.png
+- response_rate.png
+</documents>

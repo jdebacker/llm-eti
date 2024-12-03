@@ -33,6 +33,8 @@ df["Post"] = (df["round_num"] >= 8).astype(int)
 df["labor"] = (df["income"] / 20).astype(int)
 df["labor_20"] = (df["labor"] <= 20).astype(int)
 df["lab_supply"] = df["labor"] / df["max_labor"]
+# drop if labor supply > 1, this is not possible and likely error parsing data
+df = df[df["lab_supply"] <= 1]
 
 # %%
 # Create Table 5
@@ -84,11 +86,14 @@ for treat in df_bar["Treatment"].unique():
         y="labor",
         color="Post",
         barmode="group",
+        nbins=len(list(df_bar["max_labor"].unique())) + 2,
         # title=f"Figure 2: Labor Supply by Treatment ({treat})",
     )
     # Specify the x- and y-axis labels
     fig.update_xaxes(title_text="Maximum Labor")
     fig.update_yaxes(title_text="Labor Supply, in Units")
+    # set x ticks
+    fig.update_xaxes(tickvals=list(df_bar["max_labor"].unique()))
     fig.write_image(os.path.join(CUR_DIR, "tables_figures", f"LLM_Fig2_{treat_num}.png"))
 
 # %%
@@ -111,6 +116,8 @@ fig = px.scatter(
     # title="Figure 4: Mean Labor Supply by Period and Treatment",
 ).update_traces(mode='lines+markers')
 # Specify the x- and y-axis labels
+# set y axis limits
+fig.update_layout(yaxis_range=[0.7, 1.02])
 fig.update_xaxes(title_text="Period")
 fig.update_yaxes(title_text="Labor Supply in %")
 # put a vertical dashed line at period 8
@@ -148,9 +155,6 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     reg_results_dict[treat].append(f"({results.bse["post_treat"]:.3f})")
     reg_results_dict[treat].append(f"{results.params["Intercept"]:.3f}")
     reg_results_dict[treat].append(f"({results.bse["Intercept"]:.3f})")
-    # for i, val in enumerate(results.params):
-    #     reg_results_dict[treat].append(f"{val:.3f}")
-    #     reg_results_dict[treat].append(f"({results.bse[i]:.3f})")
     reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
 # put into dataframe
 reg_results = pd.DataFrame(reg_results_dict)
@@ -178,3 +182,72 @@ reg_results.to_latex(os.path.join(CUR_DIR, "tables_figures", "table6_compare.tex
 # do regression as above, but with log income as the dependent variable
 # then tax coefficient on the DD and divide by the change in (1-tau)
 # e.g. for the Prog,Flat25 group, this is (0.5 - 0.25)
+df["log_income"] = np.log(df["income"])
+# drop if missing or infinite log income
+df = df.replace([np.inf, -np.inf], np.nan)
+df = df.dropna()
+reg_results_dict = {}
+for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
+    # Keep the treatment and control
+    df_reg = df[(df["Treatment"] == treat) | (df["treatment"] == 1)]
+    # specify an indicator for the treated group
+    model = smf.ols('log_income ~ Post + treated + post_treat', data=df_reg)
+    # Estimate the model
+    results = model.fit()
+    reg_results_dict[treat] = [] # initialize list to store results
+    reg_results_dict[treat].append(f"{results.params["Post"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["Post"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["treated"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["treated"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["post_treat"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["post_treat"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params["Intercept"]:.3f}")
+    reg_results_dict[treat].append(f"({results.bse["Intercept"]:.3f})")
+    reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
+
+# put into dataframe
+reg_results = pd.DataFrame(reg_results_dict)
+reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+# Save as markdown
+reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "income_reg_table.md"), index=True)
+reg_results.to_latex(os.path.join(CUR_DIR, "tables_figures", "income_reg_table.tex"), index=True)
+
+# %%
+# Compute ETI
+ETI = reg_results.loc["Post*Treated", :].astype(float) / np.array([0.25, 0.1, -.25, -0.1])
+
+# %%
+# ETI regressions
+#
+mtr25_df1 = df[(df["treatment"] == 2) & (df["Post"] == 1)]
+mtr25_df1["tau"] = 0.75
+mtr25_df2 = df[(df["treatment"] == 4) | (df["Post"] == 0)]
+mtr25_df2["tau"] = 0.75
+mtr50_df1 = df[(df["treatment"] == 3) & (df["Post"] == 1)]
+mtr50_df1["tau"] = 0.5
+mtr50_df2 = df[(df["treatment"] == 5) | (df["Post"] == 0)]
+mtr50_df2["tau"] = 0.5
+mtr_df = pd.concat([mtr25_df1, mtr25_df2, mtr50_df1, mtr50_df2])
+model = smf.ols('log_income ~ tau', data=mtr_df)
+results = model.fit()
+print(results.summary())
+
+
+
+# %%
+# bunching plots
+# plot histogram by earnings for treatment 1
+fig = px.histogram(
+    df[df["treatment"] == 1],
+    x="income",
+    color="Post",
+    nbins=100,
+    # title="Histogram of Earnings for Treatment 1",
+)
+# update x-axis label
+fig.update_xaxes(title_text="Pre-tax Income")
+fig.update_yaxes(title_text="Count")
+fig.show()
+fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_bunching.png"))
+
+# %%

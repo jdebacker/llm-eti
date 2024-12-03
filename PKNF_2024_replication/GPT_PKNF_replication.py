@@ -10,7 +10,7 @@ import os
 
 """
 This Python script accesses the OpenAI API to get responses from
-gpt-3.5-turbo.
+OpenAI's GPT model
 """
 # %%
 # Get api key from file or prompt user for it
@@ -43,44 +43,175 @@ R_SWITCH = 8  # round number where switch tax regime
 NUM_SIMS = 1000  # this will be number of sims, each sim has R rounds
 
 
-instructions_text = (
-    "You will now participate in a decision-making experiment on "
-    + "behavior towards taxation. This experiment has a decision and "
-    + "a working stage: \n"
-    + "The decision stage consists of 16 rounds. In each round you "
-    + "will choose how much income you want to earn. The income "
-    + "determines the number of tasks you have to complete later. "
-    + "The task is to transcribe words. \n"
-    + " You will have to pay taxes on your income. The tax rate "
-    + "may, but does not have to, vary from round to round. Each of "
-    + "the 16 rounds is independent of each other. \n"
-    + "In each round, you are first informed of the tax rate in this "
-    + "round and the income that you can earn. The income can be up "
-    + "to 600 cents. The higher the income you choose, the more "
-    + "tasks you will have to complete. The lower the income, the "
-    + "earlier you can finish the experiment. 20 cents correspond to "
-    + "1 task. \n"
-    + "After you have entered an income, the number of tasks and the "
-    + "due tax payment will be automatically calculated and shown on "
-    + "the screen. The tax payment equals the chosen income "
-    + "multiplied by the tax rate. After each round, you will "
-    + "receive information about your payoff. Your payoff is the "
-    + "chosen income minus the tax payment. \n"
-    + "In the working stage, you will have to complete the number "
-    + "of tasks to earn the income that you indicated in one of "
-    + "the previous 16 rounds. This round will be randomly selected. "
-    + "It also determines how much your additional earnings from the "
-    + "experiment will be. \n"
-    + "On the following screen, we will explain the working stage in "
-    + "more detail. \n"  # New screen below
-    + "After the 16 rounds in the decision stage, you will have to "
-    + "work on the income you chose in one randomly selected round. \n"
-    + "Your task is to transcribe text sequences. Each text "
-    + "sequence consists of 10 letters, see the example below. "
-    + "The number of tasks that you will work on depends on your "
-    + "decisions in the 16 rounds and on chance. A sequence is "
-    + "counted when you correctly typed in every letter."
-)
+class TaxBehaviorReplication:
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        """Initialize the replication study with API key and model choice"""
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+        self.instructions_text = (
+            "You will now participate in a decision-making experiment on "
+            + "behavior towards taxation. This experiment has a decision and "
+            + "a working stage: \n"
+            + "The decision stage consists of 16 rounds. In each round you "
+            + "will choose how much income you want to earn. The income "
+            + "determines the number of tasks you have to complete later. "
+            + "The task is to transcribe words. \n"
+            + " You will have to pay taxes on your income. The tax rate "
+            + "may, but does not have to, vary from round to round. Each of "
+            + "the 16 rounds is independent of each other. \n"
+            + "In each round, you are first informed of the tax rate in this "
+            + "round and the income that you can earn. The income can be up "
+            + "to 600 cents. The higher the income you choose, the more "
+            + "tasks you will have to complete. The lower the income, the "
+            + "earlier you can finish the experiment. 20 cents correspond to "
+            + "1 task. \n"
+            + "After you have entered an income, the number of tasks and the "
+            + "due tax payment will be automatically calculated and shown on "
+            + "the screen. The tax payment equals the chosen income "
+            + "multiplied by the tax rate. After each round, you will "
+            + "receive information about your payoff. Your payoff is the "
+            + "chosen income minus the tax payment. \n"
+            + "In the working stage, you will have to complete the number "
+            + "of tasks to earn the income that you indicated in one of "
+            + "the previous 16 rounds. This round will be randomly selected. "
+            + "It also determines how much your additional earnings from the "
+            + "experiment will be. \n"
+            + "On the following screen, we will explain the working stage in "
+            + "more detail. \n"  # New screen below
+            + "After the 16 rounds in the decision stage, you will have to "
+            + "work on the income you chose in one randomly selected round. \n"
+            + "Your task is to transcribe text sequences. Each text "
+            + "sequence consists of 10 letters, see the example below. "
+            + "The number of tasks that you will work on depends on your "
+            + "decisions in the 16 rounds and on chance. A sequence is "
+            + "counted when you correctly typed in every letter."
+        )
+        self.tax_parameterizations = {
+            "rate1": [25, 25, 50],
+            "rate2": [50, 25, 50],
+            "max_labor": [
+                14,
+                16,
+                20,
+                22,
+                24,
+                26,
+                28,
+                30,
+            ],  # will randomly draw from this
+        }
+
+    def generate_system_prompt(self, personality_type: str = "neutral") -> str:
+        """Generate system prompt with different personality types"""
+        base_prompt = "You are participating in an economic experiment about taxation and labor supply."
+
+        personality_prompts = {
+            "risk_averse": base_prompt + " You are very cautious about financial decisions and prefer stable income.",
+            "risk_seeking": base_prompt + " You are comfortable with financial risks and aim to maximize income.",
+            "neutral": base_prompt + " You make decisions based on careful evaluation of options."
+        }
+
+        return personality_prompts.get(personality_type, personality_prompts["neutral"])
+
+    def simulate_labor_decision(self,
+                              rate1: float,
+                              rate2: float,
+                              max_labor: int,
+                              round_number: int,
+                              personality: str = "neutral") -> Dict[str, Any]:
+        """Simulate a single labor supply decision"""
+
+        # Generate the tax scenario text
+        scenario_text = self.generate_tax_scenario(rate1, rate2, max_labor, round_number)
+
+        # Get LLM response
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.generate_system_prompt(personality)},
+                {"role": "user", "content": scenario_text}
+            ],
+            temperature=0.7
+        )
+
+        # Parse the response
+        chosen_labor = self.parse_labor_decision(response.choices[0].message.content)
+
+        return {
+            "round": round_number,
+            "rate1": rate1,
+            "rate2": rate2,
+            "max_labor": max_labor,
+            "chosen_labor": chosen_labor,
+            "personality": personality,
+            "raw_response": response.choices[0].message.content
+        }
+
+    def run_full_experiment(self,
+                           num_subjects: int = 100,
+                           personality_distribution: Dict[str, float] = None) -> pd.DataFrame:
+        """Run the full experiment with multiple subjects"""
+        if personality_distribution is None:
+            personality_distribution = {
+                "neutral": 0.6,
+                "risk_averse": 0.2,
+                "risk_seeking": 0.2
+            }
+
+        results = []
+
+        for subject in range(num_subjects):
+            # Randomly assign personality type
+            personality = np.random.choice(
+                list(personality_distribution.keys()),
+                p=list(personality_distribution.values())
+            )
+
+            # Run 16 rounds for this subject
+            for round_num in range(1, 17):
+                # Get tax parameters for this round
+                rate1, rate2 = self.get_tax_rates(round_num)
+                max_labor = np.random.choice(self.tax_parameterizations["max_labor"])
+
+                result = self.simulate_labor_decision(
+                    rate1=rate1,
+                    rate2=rate2,
+                    max_labor=max_labor,
+                    round_number=round_num,
+                    personality=personality
+                )
+
+                result["subject_id"] = subject
+                results.append(result)
+
+                # Rate limiting
+                time.sleep(0.1)
+
+        return pd.DataFrame(results)
+
+
+def main(data_filename=DATA_FILENAME):
+    # Initialize experiment
+    experiment = TaxBehaviorReplication(api_key="your_api_key")
+
+    # Run experiment
+    results_df = experiment.run_full_experiment(
+        num_subjects=100,
+        personality_distribution={
+            "neutral": 0.5,
+            "risk_averse": 0.25,
+            "risk_seeking": 0.25
+        }
+    )
+
+
+    # Save results to disk as CSV and DataFrame via pickle
+    df.to_csv(os.path.join("..", "data", data_filename + ".csv"))
+    pickle.dump(df, open(os.path.join("..", "data", data_filename + ".pkl"), "wb"))
+
+
+if __name__ == "__main__":
+    main()
 
 
 # %%

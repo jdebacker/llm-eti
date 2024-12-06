@@ -106,36 +106,100 @@ class TaxBehaviorReplication:
         base_prompt = "You are participating in an economic experiment about taxation and labor supply."
 
         personality_prompts = {
-            "risk_averse": base_prompt + " You are very cautious about financial decisions and prefer stable income.",
-            "risk_seeking": base_prompt + " You are comfortable with financial risks and aim to maximize income.",
-            "neutral": base_prompt + " You make decisions based on careful evaluation of options."
+            "risk_averse": base_prompt
+            + " You are very cautious about financial decisions and prefer stable income.",
+            "risk_seeking": base_prompt
+            + " You are comfortable with financial risks and aim to maximize income.",
+            "neutral": base_prompt
+            + " You make decisions based on careful evaluation of options.",
         }
 
-        return personality_prompts.get(personality_type, personality_prompts["neutral"])
+        return personality_prompts.get(
+            personality_type, personality_prompts["neutral"]
+        )
 
-    def simulate_labor_decision(self,
-                              rate1: float,
-                              rate2: float,
-                              max_labor: int,
-                              round_number: int,
-                              personality: str = "neutral") -> Dict[str, Any]:
+    def generate_tax_scenario(
+        self,
+        rate1,
+        rate2,
+        max_labor,
+        bkt1=400,
+        wage_rate=20,
+        round_number=1,
+        max_rounds=R,
+    ) -> str:
+        if (
+            rate1 == rate2
+        ):  # I don't know if PKNF modify instructions this way or not -- they only give example of the progressive tax case in appendix
+            tax_text = (
+                f"In this round, the tax rate is "
+                + f"{rate1}"
+                + "% for all incomes. For example, for an income of "
+                + f"{bkt1 + 20} cents, your tax payment will be "
+                + f"{(rate1 / 100) * 420:.0f}"
+                + " cents."
+            )
+        else:
+            tax_text = (
+                f"In this round, the tax rate is "
+                + f"{rate1}"
+                + "% for incomes equal to or below "
+                + f"{bkt1}"
+                + " cents.  The tax rate is "
+                + f"{rate2}"
+                + "% on the entire income if income exceeds "
+                + f"{bkt1}"
+                + f" cents. For example, for an income of {bkt1 + 20} "
+                + " cents, your tax payment will be "
+                + f"{(rate2 / 100) * (bkt1 + 20):.0f}"
+                + " cents."
+            )
+        sim_text = (
+            f"Round {round_number} of {max_rounds} \n"
+            + tax_text
+            + "\n"
+            + f"You can earn an income of {max_labor * wage_rate:.0f}"
+            + " cents. \n"
+            + "Please indicate whether you want to work for "
+            + f"{max_labor * wage_rate:.0f} cents or another income: \n"
+            # + "Number of text sequences for this chosen income: "
+            # + {chosen_labor} + "\n"  NOTE: This is in original instructions, but not sure how work with LLM
+        )
+
+    return sim_text
+
+    def simulate_labor_decision(
+        self,
+        rate1: float,
+        rate2: float,
+        max_labor: int,
+        round_number: int,
+        personality: str = "neutral",
+    ) -> Dict[str, Any]:
         """Simulate a single labor supply decision"""
 
         # Generate the tax scenario text
-        scenario_text = self.generate_tax_scenario(rate1, rate2, max_labor, round_number)
+        scenario_text = self.generate_tax_scenario(
+            rate1, rate2, max_labor, round_number
+        )
 
         # Get LLM response
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": self.generate_system_prompt(personality)},
-                {"role": "user", "content": scenario_text}
+                {
+                    "role": "system",
+                    "content": self.generate_system_prompt(personality),
+                },
+                {"role": "user", "content": scenario_text},
             ],
-            temperature=0.7
+            temperature=0.7,
         )
 
         # Parse the response
-        chosen_labor = self.parse_labor_decision(response.choices[0].message.content)
+        chosen_labor = self.parse_labor_decision(
+            response.choices[0].message.content
+        )
 
         return {
             "round": round_number,
@@ -144,18 +208,20 @@ class TaxBehaviorReplication:
             "max_labor": max_labor,
             "chosen_labor": chosen_labor,
             "personality": personality,
-            "raw_response": response.choices[0].message.content
+            "raw_response": response.choices[0].message.content,
         }
 
-    def run_full_experiment(self,
-                           num_subjects: int = 100,
-                           personality_distribution: Dict[str, float] = None) -> pd.DataFrame:
+    def run_full_experiment(
+        self,
+        num_subjects: int = 100,
+        personality_distribution: Dict[str, float] = None,
+    ) -> pd.DataFrame:
         """Run the full experiment with multiple subjects"""
         if personality_distribution is None:
             personality_distribution = {
                 "neutral": 0.6,
                 "risk_averse": 0.2,
-                "risk_seeking": 0.2
+                "risk_seeking": 0.2,
             }
 
         results = []
@@ -164,21 +230,23 @@ class TaxBehaviorReplication:
             # Randomly assign personality type
             personality = np.random.choice(
                 list(personality_distribution.keys()),
-                p=list(personality_distribution.values())
+                p=list(personality_distribution.values()),
             )
 
             # Run 16 rounds for this subject
             for round_num in range(1, 17):
                 # Get tax parameters for this round
                 rate1, rate2 = self.get_tax_rates(round_num)
-                max_labor = np.random.choice(self.tax_parameterizations["max_labor"])
+                max_labor = np.random.choice(
+                    self.tax_parameterizations["max_labor"]
+                )
 
                 result = self.simulate_labor_decision(
                     rate1=rate1,
                     rate2=rate2,
                     max_labor=max_labor,
                     round_number=round_num,
-                    personality=personality
+                    personality=personality,
                 )
 
                 result["subject_id"] = subject
@@ -200,14 +268,15 @@ def main(data_filename=DATA_FILENAME):
         personality_distribution={
             "neutral": 0.5,
             "risk_averse": 0.25,
-            "risk_seeking": 0.25
-        }
+            "risk_seeking": 0.25,
+        },
     )
-
 
     # Save results to disk as CSV and DataFrame via pickle
     df.to_csv(os.path.join("..", "data", data_filename + ".csv"))
-    pickle.dump(df, open(os.path.join("..", "data", data_filename + ".pkl"), "wb"))
+    pickle.dump(
+        df, open(os.path.join("..", "data", data_filename + ".pkl"), "wb")
+    )
 
 
 if __name__ == "__main__":
@@ -363,7 +432,7 @@ for i in range(NUM_SIMS):
         sim_text = tax_sim(rate1, rate2, max_labor, round_number=j + 1)
         # get response from GPT-3.5
         response = client.chat.completions.create(
-            model="gpt-4o-mini", #"gpt-3.5-turbo",
+            model="gpt-4o-mini",  # "gpt-3.5-turbo",
             temperature=1.0,
             messages=[
                 {"role": "system", "content": instructions_text},

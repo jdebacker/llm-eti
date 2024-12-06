@@ -44,8 +44,18 @@ NUM_SIMS = 1000  # this will be number of sims, each sim has R rounds
 
 
 class TaxBehaviorReplication:
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
-        """Initialize the replication study with API key and model choice"""
+    def __init__(self, api_key, model="gpt-4o-mini"):
+        """
+        Initialize the replication study with API key and model choice
+
+        Args:
+            api_key (str): OpenAI API key
+            model (str): OpenAI model to use for simulation
+
+        Returns:
+            None
+
+        """
         self.client = OpenAI(api_key=api_key)
         self.model = model
         self.instructions_text = (
@@ -101,8 +111,17 @@ class TaxBehaviorReplication:
             ],  # will randomly draw from this
         }
 
-    def generate_system_prompt(self, personality_type: str = "neutral") -> str:
-        """Generate system prompt with different personality types"""
+    def generate_system_prompt(self, personality_type="neutral"):
+        """
+        Generate system prompt with different personality types
+
+        Args:
+            personality_type (str): Type of personality to generate prompt for
+
+        Returns:
+            str: System prompt text
+
+        """
         base_prompt = "You are participating in an economic experiment about taxation and labor supply."
 
         personality_prompts = {
@@ -127,12 +146,31 @@ class TaxBehaviorReplication:
         wage_rate=20,
         round_number=1,
         max_rounds=R,
-    ) -> str:
+    ):
+        """
+        Generate a tax scenario text for a given round
+
+        Args:
+            rate1 (float)): tax rate on first income bracket, in
+                percentage points
+            rate2 (float): tax rate on all income when above threshold,
+                in percentage points
+            bkt1 (float): income (in cents) above which rate2 applies
+            max_labor (float): maximum units of labor supply
+            wage_rate (float): wage rate per unit of labor, in cents
+            round_number (int): round number
+            max_rounds (int): maximum number of rounds
+
+        Returns:
+            sim_text (str): text string to pass to GPT-3 model
+
+        """
         if (
             rate1 == rate2
-        ):  # I don't know if PKNF modify instructions this way or not -- they only give example of the progressive tax case in appendix
+        ):  # I don't know if PKNF modify instructions this way or not --
+            # they only give example of the progressive tax case in appendix
             tax_text = (
-                f"In this round, the tax rate is "
+                "In this round, the tax rate is "
                 + f"{rate1}"
                 + "% for all incomes. For example, for an income of "
                 + f"{bkt1 + 20} cents, your tax payment will be "
@@ -141,7 +179,7 @@ class TaxBehaviorReplication:
             )
         else:
             tax_text = (
-                f"In this round, the tax rate is "
+                "In this round, the tax rate is "
                 + f"{rate1}"
                 + "% for incomes equal to or below "
                 + f"{bkt1}"
@@ -166,17 +204,32 @@ class TaxBehaviorReplication:
             # + {chosen_labor} + "\n"  NOTE: This is in original instructions, but not sure how work with LLM
         )
 
-    return sim_text
+        return sim_text
 
     def simulate_labor_decision(
         self,
-        rate1: float,
-        rate2: float,
-        max_labor: int,
-        round_number: int,
-        personality: str = "neutral",
-    ) -> Dict[str, Any]:
-        """Simulate a single labor supply decision"""
+        rate1,
+        rate2,
+        max_labor,
+        round_number,
+        personality="neutral",
+    ):
+        """
+        Simulate a single labor supply decision
+
+        Args:
+            rate1 (float): tax rate on first income bracket, in
+                percentage points
+            rate2 (float): tax rate on all income when above threshold,
+                in percentage points
+            max_labor (float): maximum units of labor supply
+            round_number (int): round number
+            personality (str): personality type of the subject
+
+        Returns:
+            dict: dictionary containing the results of the simulation
+
+        """
 
         # Generate the tax scenario text
         scenario_text = self.generate_tax_scenario(
@@ -213,10 +266,20 @@ class TaxBehaviorReplication:
 
     def run_full_experiment(
         self,
-        num_subjects: int = 100,
-        personality_distribution: Dict[str, float] = None,
-    ) -> pd.DataFrame:
-        """Run the full experiment with multiple subjects"""
+        num_subjects=100,
+        personality_distribution=None,
+    ):
+        """
+        Run the full experiment with multiple subjects
+
+        Args:
+            num_subjects (int): number of subjects to simulate
+            personality_distribution (dict): distribution of personality types
+
+        Returns:
+            pd.DataFrame: DataFrame containing the results of the experiment
+
+        """
         if personality_distribution is None:
             personality_distribution = {
                 "neutral": 0.6,

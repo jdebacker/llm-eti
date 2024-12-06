@@ -7,6 +7,7 @@ import os
 import pickle
 import plotly.express as px
 
+
 # get directory of current file
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
 

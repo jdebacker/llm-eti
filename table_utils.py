@@ -34,8 +34,7 @@ def generate_latex_table(results_dict: dict, summary_stats: dict) -> str:
 
     # Get model results
     model_results = {
-        model: next(r for r in results_dict if r["Model"] == model)
-        for model in models
+        model: next(r for r in results_dict if r["Model"] == model) for model in models
     }
 
     # Add summary stats
@@ -92,9 +91,7 @@ def generate_latex_table(results_dict: dict, summary_stats: dict) -> str:
     for var in var_names:
         row = [var_names[var]]
         for model in models:
-            reg = model_results[model]["regs"][
-                2
-            ]  # Use third regression (full model)
+            reg = model_results[model]["regs"][2]  # Use third regression (full model)
             if var in reg.params.index:
                 coef = reg.params[var]
                 se = reg.bse[var]

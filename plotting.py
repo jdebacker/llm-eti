@@ -57,9 +57,7 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
         model_df = df[df["model"] == model]
         ci_data = []
         for bin_val in income_bins[:-1]:
-            bin_data = model_df[model_df["income_bin"] == bin_val][
-                "implied_eti"
-            ]
+            bin_data = model_df[model_df["income_bin"] == bin_val]["implied_eti"]
             ci = np.percentile(bin_data, [2.5, 97.5])
             ci_data.append({"bin": bin_val, "lower": ci[0], "upper": ci[1]})
         ci_df = pd.DataFrame(ci_data)
@@ -71,9 +69,7 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
             marker="o",
             label=f"{model} (mean)",
         )
-        ax.fill_between(
-            ci_df["bin"], ci_df["lower"], ci_df["upper"], alpha=0.2
-        )
+        ax.fill_between(ci_df["bin"], ci_df["lower"], ci_df["upper"], alpha=0.2)
 
     plt.title("ETI by Income Level")
     plt.xlabel("Income")

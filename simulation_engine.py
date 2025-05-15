@@ -48,9 +48,7 @@ class TaxSimulation:
         self, broad_income: float, prior_rate: float, new_rate: float
     ) -> List[Dict]:
         taxable_income = broad_income * self.params.taxable_income_ratio
-        prompt = self.create_prompt(
-            broad_income, taxable_income, prior_rate, new_rate
-        )
+        prompt = self.create_prompt(broad_income, taxable_income, prior_rate, new_rate)
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
@@ -97,9 +95,7 @@ class TaxSimulation:
         prior_rate: float,
     ) -> pd.DataFrame:
         all_results = []
-        income_ranges = self.generate_income_ranges(
-            min_income, max_income, income_step
-        )
+        income_ranges = self.generate_income_ranges(min_income, max_income, income_step)
         tax_rates = np.arange(
             self.params.min_rate,
             self.params.max_rate + self.params.step_size,
@@ -110,9 +106,7 @@ class TaxSimulation:
         with tqdm(total=total_simulations, desc="Running simulations") as pbar:
             for broad_income in income_ranges:
                 for rate in tax_rates:
-                    results = self.run_single_simulation(
-                        broad_income, prior_rate, rate
-                    )
+                    results = self.run_single_simulation(broad_income, prior_rate, rate)
                     all_results.extend(results)
                     pbar.update(1)
 

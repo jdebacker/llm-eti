@@ -24,9 +24,7 @@ def run_model_regressions(model_df: pd.DataFrame, model_name: str) -> dict:
             model_df["income_100k"] * model_df["abs_mtr_change"]
         )
         X3 = add_constant(
-            model_df[
-                ["income_100k", "abs_mtr_change", "income_abs_mtr_interact"]
-            ]
+            model_df[["income_100k", "abs_mtr_change", "income_abs_mtr_interact"]]
         )
         reg3 = sm.OLS(model_df["implied_eti"], X3).fit(cov_type="HC1")
         print(reg3.summary())

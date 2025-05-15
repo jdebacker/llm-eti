@@ -3,6 +3,7 @@
 from openai import OpenAI
 import pandas as pd
 import numpy as np
+import re
 import pickle
 import time
 import os
@@ -17,7 +18,7 @@ OpenAI's GPT model
 # Check for a file named "gpt_api_key.txt" in the current directory
 if os.path.exists(os.path.join("gpt_api_key.txt")):
     with open(os.path.join("gpt_api_key.txt"), "r") as file:
-        API_KEY = file.read().strip()
+        API_KEY = str(file.read().strip())
 else:  # if file not exist, prompt user for token
     try:
         API_KEY = input(
@@ -30,21 +31,16 @@ else:  # if file not exist, prompt user for token
         API_KEY = ""
 
 # %%
-# Set OpenAI API key
-client = OpenAI(api_key=API_KEY)  # Chatgpt model
-# define file name (a string, path and extension set below)
-DATA_FILENAME = "PKNF_replication_results_gpt-4o-mini"
 # make sure the data directory exists
 if not os.path.exists(os.path.join("..", "data")):
     os.makedirs(os.path.join("..", "data"))
 # Set number of observations to get from GPT
 R = 16  # number of rounds in the tax simulation
 R_SWITCH = 8  # round number where switch tax regime
-NUM_SIMS = 1000  # this will be number of sims, each sim has R rounds
 
 
 class TaxBehaviorReplication:
-    def __init__(self, api_key, model="gpt-4o-mini"):
+    def __init__(self, model="gpt-4o-mini"):
         """
         Initialize the replication study with API key and model choice
 
@@ -56,7 +52,9 @@ class TaxBehaviorReplication:
             None
 
         """
-        self.client = OpenAI(api_key=api_key)
+        self.client = OpenAI(api_key=API_KEY)
+        # define file name (a string, path and extension set below)
+        self.data_filename = f"PKNF_replication_results_{model}"
         self.model = model
         self.instructions_text = (
             "You will now participate in a decision-making experiment on "
@@ -206,12 +204,72 @@ class TaxBehaviorReplication:
 
         return sim_text
 
+    def get_tax_rates(self, round_num, treatment):
+        """
+        Get tax rates for a given round
+
+        Args:
+            round_num (int): round number
+
+        Returns:
+            tuple: tax rates (rate1, rate2)
+
+        """
+        if treatment == 1:  # control group: faces progressive taxes in all rounds
+            rate1 = self.tax_parameterizations["rate1"][0]
+            rate2 = self.tax_parameterizations["rate2"][0]
+        elif treatment == 2:  # treatment 1: moves from progressive to flat tax at 25%
+            rate1 = self.tax_parameterizations["rate1"][0]
+            rate2 = self.tax_parameterizations["rate2"][0]
+            if round_num > R_SWITCH:
+                rate1 = self.tax_parameterizations["rate1"][1]
+                rate2 = self.tax_parameterizations["rate2"][1]
+        elif treatment == 3:  # treatment 2: moves from progressive to flat tax at 50%
+            rate1 = self.tax_parameterizations["rate1"][0]
+            rate2 = self.tax_parameterizations["rate2"][0]
+            if round_num > R_SWITCH:
+                rate1 = self.tax_parameterizations["rate1"][2]
+                rate2 = self.tax_parameterizations["rate2"][2]
+        if treatment == 4:  # treatment that starts with flat tax of 50%, then switches to progressive
+            rate1 = self.tax_parameterizations["rate1"][2]
+            rate2 = self.tax_parameterizations["rate2"][2]
+            if round_num > R_SWITCH:
+                rate1 = self.tax_parameterizations["rate1"][0]
+                rate2 = self.tax_parameterizations["rate2"][0]
+        elif treatment == 5:  # treatment that starts with flat tax of 25%, then switches to progressive
+            rate1 = self.tax_parameterizations["rate1"][1]
+            rate2 = self.tax_parameterizations["rate2"][1]
+            if round_num > R_SWITCH:
+                rate1 = self.tax_parameterizations["rate1"][0]
+                rate2 = self.tax_parameterizations["rate2"][0]
+
+        return rate1, rate2
+
+    def parse_labor_decision(self, response_list):
+        """
+        Parse the labor decision from the LLM response
+
+        Args:
+            response_list (list): text string responses from LLM
+
+        Returns:
+            labor (list): chosen labor supply for each observation in the response
+
+        """
+        wage_rate = 20  # cents per task -- hardcoded for now
+        income_list = [re.findall(r'\d+', result)[0] for result in response_list]
+        labor = [int(income) / wage_rate for income in income_list]
+
+        return labor
+
     def simulate_labor_decision(
         self,
         rate1,
         rate2,
         max_labor,
+        num_obs,
         round_number,
+        treatment,
         personality="neutral",
     ):
         """
@@ -223,45 +281,51 @@ class TaxBehaviorReplication:
             rate2 (float): tax rate on all income when above threshold,
                 in percentage points
             max_labor (float): maximum units of labor supply
+            num_obs (int): number of observations to get from GPT
             round_number (int): round number
+            treatment (int): treatment assignment (1-5)
             personality (str): personality type of the subject
 
         Returns:
             dict: dictionary containing the results of the simulation
 
         """
+        # find the tax rates based on the round number and treatment
+        rate1, rate2 = self.get_tax_rates(
+            round_num=round_number, treatment=treatment
+        )
 
         # Generate the tax scenario text
         scenario_text = self.generate_tax_scenario(
-            rate1, rate2, max_labor, round_number
+            rate1, rate2, max_labor, round_number=round_number
         )
 
         # Get LLM response
         response = self.client.chat.completions.create(
             model=self.model,
+            temperature=1.0,
             messages=[
-                {
-                    "role": "system",
-                    "content": self.generate_system_prompt(personality),
-                },
-                {"role": "user", "content": scenario_text},
+                {"role": "system", "content": self.instructions_text},
+                {"role": "user", "content": scenario_text}
             ],
-            temperature=0.7,
+            n=num_obs
         )
 
         # Parse the response
+        response_list = [choice.message.content for choice in response.choices]
         chosen_labor = self.parse_labor_decision(
-            response.choices[0].message.content
+            response_list
         )
 
         return {
-            "round": round_number,
-            "rate1": rate1,
-            "rate2": rate2,
-            "max_labor": max_labor,
+            "round": [round_number] * num_obs,
+            "rate1": [rate1] * num_obs,
+            "rate2": [rate2] * num_obs,
+            "treatment": [treatment] * num_obs,
+            "max_labor": [max_labor * 20] * num_obs,
             "chosen_labor": chosen_labor,
-            "personality": personality,
-            "raw_response": response.choices[0].message.content,
+            "personality": [personality] * num_obs,
+            "raw_response": response_list,
         }
 
     def run_full_experiment(
@@ -273,33 +337,45 @@ class TaxBehaviorReplication:
         Run the full experiment with multiple subjects
 
         Args:
-            num_subjects (int): number of subjects to simulate
+            num_subjects (int): number of subjects to simulate per treatment
             personality_distribution (dict): distribution of personality types
 
         Returns:
             pd.DataFrame: DataFrame containing the results of the experiment
 
         """
-        if personality_distribution is None:
-            personality_distribution = {
-                "neutral": 0.6,
-                "risk_averse": 0.2,
-                "risk_seeking": 0.2,
-            }
+        # if personality_distribution is None:
+        #     personality_distribution = {
+        #         "neutral": 0.6,
+        #         "risk_averse": 0.2,
+        #         "risk_seeking": 0.2,
+        #     }
 
-        results = []
+        results = {
+            "subject_id": [],
+            "round": [],
+            "rate1": [],
+            "rate2": [],
+            "treatment": [],
+            "max_labor": [],
+            "chosen_labor": [],
+            "personality": [],
+            "raw_response": [],
+        }
 
-        for subject in range(num_subjects):
+        # Loop over treatments
+        for treatment in range(1, 6):
             # Randomly assign personality type
-            personality = np.random.choice(
-                list(personality_distribution.keys()),
-                p=list(personality_distribution.values()),
-            )
+            # personality = np.random.choice(
+            #     list(personality_distribution.keys()),
+            #     p=list(personality_distribution.values()),
+            # )
+            personality = "neutral"
 
-            # Run 16 rounds for this subject
-            for round_num in range(1, 17):
+            # Run R rounds for this subject  # TODO: vectorize this
+            for round_num in range(1, R+1):
                 # Get tax parameters for this round
-                rate1, rate2 = self.get_tax_rates(round_num)
+                rate1, rate2 = self.get_tax_rates(round_num, treatment)
                 max_labor = np.random.choice(
                     self.tax_parameterizations["max_labor"]
                 )
@@ -308,12 +384,15 @@ class TaxBehaviorReplication:
                     rate1=rate1,
                     rate2=rate2,
                     max_labor=max_labor,
+                    num_obs=num_subjects,
                     round_number=round_num,
+                    treatment=treatment,
                     personality=personality,
                 )
 
-                result["subject_id"] = subject
-                results.append(result)
+                result["subject_id"] = np.arange(1, num_subjects + 1).tolist()
+                for k in results.keys():
+                    results[k].extend(result[k])
 
                 # Rate limiting
                 time.sleep(0.1)
@@ -321,239 +400,26 @@ class TaxBehaviorReplication:
         return pd.DataFrame(results)
 
 
-def main(data_filename=DATA_FILENAME):
+def main():
     # Initialize experiment
-    experiment = TaxBehaviorReplication(api_key="your_api_key")
+    experiment = TaxBehaviorReplication()
 
     # Run experiment
     results_df = experiment.run_full_experiment(
         num_subjects=100,
-        personality_distribution={
-            "neutral": 0.5,
-            "risk_averse": 0.25,
-            "risk_seeking": 0.25,
-        },
+        # personality_distribution={
+        #     "neutral": 0.5,
+        #     "risk_averse": 0.25,
+        #     "risk_seeking": 0.25,
+        # },
     )
 
     # Save results to disk as CSV and DataFrame via pickle
-    df.to_csv(os.path.join("..", "data", data_filename + ".csv"))
+    results_df.to_csv(os.path.join("..", "data", experiment.data_filename + ".csv"))
     pickle.dump(
-        df, open(os.path.join("..", "data", data_filename + ".pkl"), "wb")
+        results_df, open(os.path.join("..", "data", experiment.data_filename + ".pkl"), "wb")
     )
 
 
 if __name__ == "__main__":
     main()
-
-
-# %%
-# Define a function for tax simulation
-def tax_sim(
-    rate1,
-    rate2,
-    max_labor,
-    bkt1=400,
-    wage_rate=20,
-    round_number=1,
-    max_rounds=R,
-):
-    """
-    Returns a text string to pass to the GPT-3 model as instructions for
-    the tax simulation.
-
-    Args:
-        rate1 (float)): tax rate on first income bracket, in
-            percentage points
-        rate2 (float): tax rate on all income when above threshold,
-            in percentage points
-        bkt1 (float): income (in cents) above which rate2 applies
-        max_labor (float): maximum units of labor supply
-        wage_rate (float): wage rate per unit of labor, in cents
-        round_number (int): round number
-        max_rounds (int): maximum number of rounds
-
-    Returns:
-        sim_text (str): text string to pass to GPT-3 model
-    """
-    if (
-        rate1 == rate2
-    ):  # I don't know if PKNF modify instructions this way or not -- they only give example of the progressive tax case in appendix
-        tax_text = (
-            f"In this round, the tax rate is "
-            + f"{rate1}"
-            + "% for all incomes. For example, for an income of "
-            + f"{bkt1 + 20} cents, your tax payment will be "
-            + f"{(rate1 / 100) * 420:.0f}"
-            + " cents."
-        )
-    else:
-        tax_text = (
-            f"In this round, the tax rate is "
-            + f"{rate1}"
-            + "% for incomes equal to or below "
-            + f"{bkt1}"
-            + " cents.  The tax rate is "
-            + f"{rate2}"
-            + "% on the entire income if income exceeds "
-            + f"{bkt1}"
-            + f" cents. For example, for an income of {bkt1 + 20} "
-            + " cents, your tax payment will be "
-            + f"{(rate2 / 100) * (bkt1 + 20):.0f}"
-            + " cents."
-        )
-    sim_text = (
-        f"Round {round_number} of {max_rounds} \n"
-        + tax_text
-        + "\n"
-        + f"You can earn an income of {max_labor * wage_rate:.0f}"
-        + " cents. \n"
-        + "Please indicate whether you want to work for "
-        + f"{max_labor * wage_rate:.0f} cents or another income: \n"
-        # + "Number of text sequences for this chosen income: "
-        # + {chosen_labor} + "\n"  NOTE: This is in original instructions, but not sure how work with LLM
-    )
-
-    return sim_text
-
-
-tax_parameterizations = {
-    "rate1": [25, 25, 50],
-    "rate2": [50, 25, 50],
-    "max_labor": [
-        14,
-        16,
-        20,
-        22,
-        24,
-        26,
-        28,
-        30,
-    ],  # will randomly draw from this
-}
-
-# %%
-# Setup loop to get responses from GPT-3.5
-num_obs = NUM_SIMS * R
-obs_number = []
-model_answer = []
-model_response = []
-rate1_list = []
-rate2_list = []
-max_labor_list = []
-treatment_list = []
-sim_num_list = []
-round_num_list = []
-obs = 0
-for i in range(NUM_SIMS):
-    # Assign 1/5 of sims to each of 5 treatments
-    num_treatments = 5
-    if i < np.ceil(NUM_SIMS / 4):  # control group
-        treatment_assignment = 1
-        rate1 = tax_parameterizations["rate1"][0]
-        rate2 = tax_parameterizations["rate2"][0]
-    elif i < np.ceil(2 * NUM_SIMS / 4):  # treatment 2
-        treatment_assignment = 2
-        rate1 = tax_parameterizations["rate1"][1]
-        rate2 = tax_parameterizations["rate2"][1]
-    elif i < np.ceil(3 * NUM_SIMS / 4):  # treatment 3
-        treatment_assignment = 3
-        rate1 = tax_parameterizations["rate1"][2]
-        rate2 = tax_parameterizations["rate2"][2]
-    else:  # this is treatment that started with flat and switched to progressive
-        treatment_assignment = np.random.choice([4, 5])
-        rate1 = tax_parameterizations["rate1"][0]
-        rate2 = tax_parameterizations["rate2"][0]
-    if treatment_assignment == 4:  # treatment that starts with flat tax of 25%
-        rate1 = tax_parameterizations["rate1"][1]
-        rate2 = tax_parameterizations["rate2"][1]
-    elif (
-        treatment_assignment == 5
-    ):  # treatment that starts with flat tax of 50%
-        rate1 = tax_parameterizations["rate1"][2]
-        rate2 = tax_parameterizations["rate2"][2]
-    else:  # all other treatments start with progressive tax
-        rate1 = tax_parameterizations["rate1"][0]
-        rate2 = tax_parameterizations["rate2"][0]
-    for j in range(R):
-        # switch tax regime halfway through
-        if j >= R_SWITCH:
-            if treatment_assignment == 1:  # control group
-                rate1 = tax_parameterizations["rate1"][0]
-                rate2 = tax_parameterizations["rate2"][0]
-            elif treatment_assignment == 2:  # treatment 1
-                rate1 = tax_parameterizations["rate1"][1]
-                rate2 = tax_parameterizations["rate2"][1]
-            elif treatment_assignment == 3:  # treatment 2
-                rate1 = tax_parameterizations["rate1"][2]
-                rate2 = tax_parameterizations["rate2"][2]
-            else:  # these treatments started with flat tax and switch to progressive
-                rate1 = tax_parameterizations["rate1"][0]
-                rate2 = tax_parameterizations["rate2"][0]
-        # randomly draw max_labor
-        max_labor = np.random.choice(tax_parameterizations["max_labor"])
-        # get text for simulation
-        sim_text = tax_sim(rate1, rate2, max_labor, round_number=j + 1)
-        # get response from GPT-3.5
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # "gpt-3.5-turbo",
-            temperature=1.0,
-            messages=[
-                {"role": "system", "content": instructions_text},
-                {"role": "user", "content": sim_text},
-            ],
-        )  # TODO: add history through the rounds
-        obs = obs + 1
-
-        result = ""
-        for choice in response.choices:
-            result += choice.message.content
-
-        obs_number.append(obs)
-        model_answer.append(result)
-        model_response.append(response)
-        rate1_list.append(rate1)
-        rate2_list.append(rate2)
-        max_labor_list.append(max_labor)
-        treatment_list.append(treatment_assignment)
-        sim_num_list.append(i)
-        round_num_list.append(j)
-
-        print(f"Simulation {i}, round {j}")
-        print(result)
-        # build in sleep time to try to avoid rate limit
-        time.sleep(3.5)
-    time.sleep(5)
-
-# Put results in DataFrame
-df = pd.DataFrame(
-    list(
-        zip(
-            obs_number,
-            sim_num_list,
-            round_num_list,
-            treatment_list,
-            model_answer,
-            model_response,
-            rate1_list,
-            rate2_list,
-            max_labor_list,
-        )
-    ),
-    columns=[
-        "obs_number",
-        "sim_num",
-        "round_num",
-        "treatment",
-        "model_answer",
-        "model_response",
-        "rate1",
-        "rate2",
-        "max_labor",
-    ],
-)
-# Save results to disk as CSV and DataFrame via pickle
-df.to_csv(os.path.join("..", "data", DATA_FILENAME + ".csv"))
-pickle.dump(df, open(os.path.join("..", "data", DATA_FILENAME + ".pkl"), "wb"))
-
-# %%
-#

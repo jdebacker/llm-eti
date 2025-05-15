@@ -1,3 +1,11 @@
-streamlit
-openai
+openai>=1.0.0
+pandas
+numpy
 matplotlib
+seaborn
+python-dotenv
+click
+tqdm
+scikit-learn
+statsmodels
+stargazer

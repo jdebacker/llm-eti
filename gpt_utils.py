@@ -27,12 +27,10 @@ class GPTClient:
         new_income: float,
     ) -> float:
         try:
-            percent_change_income = (
-                new_income - initial_income
-            ) / initial_income
-            percent_change_net_of_tax_rate = (
-                (1 - new_rate) - (1 - initial_rate)
-            ) / (1 - initial_rate)
+            percent_change_income = (new_income - initial_income) / initial_income
+            percent_change_net_of_tax_rate = ((1 - new_rate) - (1 - initial_rate)) / (
+                1 - initial_rate
+            )
             if percent_change_net_of_tax_rate == 0:
                 return None
             return percent_change_income / percent_change_net_of_tax_rate

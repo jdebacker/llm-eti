@@ -131,9 +131,7 @@ class TaxBehaviorReplication:
             + " You make decisions based on careful evaluation of options.",
         }
 
-        return personality_prompts.get(
-            personality_type, personality_prompts["neutral"]
-        )
+        return personality_prompts.get(personality_type, personality_prompts["neutral"])
 
     def generate_tax_scenario(
         self,
@@ -230,13 +228,17 @@ class TaxBehaviorReplication:
             if round_num > R_SWITCH:
                 rate1 = self.tax_parameterizations["rate1"][2]
                 rate2 = self.tax_parameterizations["rate2"][2]
-        if treatment == 4:  # treatment that starts with flat tax of 40%, then switches to progressive
+        if (
+            treatment == 4
+        ):  # treatment that starts with flat tax of 40%, then switches to progressive
             rate1 = self.tax_parameterizations["rate1"][2]
             rate2 = self.tax_parameterizations["rate2"][2]
             if round_num > R_SWITCH:
                 rate1 = self.tax_parameterizations["rate1"][0]
                 rate2 = self.tax_parameterizations["rate2"][0]
-        elif treatment == 5:  # treatment that starts with flat tax of 25%, then switches to progressive
+        elif (
+            treatment == 5
+        ):  # treatment that starts with flat tax of 25%, then switches to progressive
             rate1 = self.tax_parameterizations["rate1"][1]
             rate2 = self.tax_parameterizations["rate2"][1]
             if round_num > R_SWITCH:
@@ -257,7 +259,7 @@ class TaxBehaviorReplication:
 
         """
         wage_rate = 20  # cents per task -- hardcoded for now
-        income_list = [re.findall(r'\d+', result)[0] for result in response_list]
+        income_list = [re.findall(r"\d+", result)[0] for result in response_list]
         labor = [int(income) / wage_rate for income in income_list]
 
         return labor
@@ -291,9 +293,7 @@ class TaxBehaviorReplication:
 
         """
         # find the tax rates based on the round number and treatment
-        rate1, rate2 = self.get_tax_rates(
-            round_num=round_number, treatment=treatment
-        )
+        rate1, rate2 = self.get_tax_rates(round_num=round_number, treatment=treatment)
 
         # Generate the tax scenario text
         scenario_text = self.generate_tax_scenario(
@@ -306,16 +306,14 @@ class TaxBehaviorReplication:
             temperature=1.0,
             messages=[
                 {"role": "system", "content": self.instructions_text},
-                {"role": "user", "content": scenario_text}
+                {"role": "user", "content": scenario_text},
             ],
-            n=num_obs
+            n=num_obs,
         )
 
         # Parse the response
         response_list = [choice.message.content for choice in response.choices]
-        chosen_labor = self.parse_labor_decision(
-            response_list
-        )
+        chosen_labor = self.parse_labor_decision(response_list)
 
         return {
             "round": [round_number] * num_obs,
@@ -373,12 +371,10 @@ class TaxBehaviorReplication:
             personality = "neutral"
 
             # Run R rounds for this subject  # TODO: vectorize this
-            for round_num in range(1, R+1):
+            for round_num in range(1, R + 1):
                 # Get tax parameters for this round
                 rate1, rate2 = self.get_tax_rates(round_num, treatment)
-                max_labor = np.random.choice(
-                    self.tax_parameterizations["max_labor"]
-                )
+                max_labor = np.random.choice(self.tax_parameterizations["max_labor"])
 
                 result = self.simulate_labor_decision(
                     rate1=rate1,
@@ -417,7 +413,8 @@ def main():
     # Save results to disk as CSV and DataFrame via pickle
     results_df.to_csv(os.path.join("..", "data", experiment.data_filename + ".csv"))
     pickle.dump(
-        results_df, open(os.path.join("..", "data", experiment.data_filename + ".pkl"), "wb")
+        results_df,
+        open(os.path.join("..", "data", experiment.data_filename + ".pkl"), "wb"),
     )
 
 

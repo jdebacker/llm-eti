@@ -62,8 +62,14 @@ table5["Treatment"] = table5["Treatment"].map(treat_dict)
 # Format decimals
 
 # Save as markdown
-table5.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table5.md"), floatfmt=".2f", index=False)
-table5.to_latex(os.path.join(CUR_DIR, "tables_figures", "table5.tex"), float_format="%.2f", index=False)
+table5.to_markdown(
+    os.path.join(CUR_DIR, "tables_figures", "table5.md"), floatfmt=".2f", index=False
+)
+table5.to_latex(
+    os.path.join(CUR_DIR, "tables_figures", "table5.tex"),
+    float_format="%.2f",
+    index=False,
+)
 # TODO: add p-value for test of diffs in means
 
 # %%
@@ -95,7 +101,9 @@ for treat in df_bar["Treatment"].unique():
     fig.update_yaxes(title_text="Labor Supply, in Units")
     # set x ticks
     fig.update_xaxes(tickvals=list(df_bar["max_labor"].unique()))
-    fig.write_image(os.path.join(CUR_DIR, "tables_figures", f"LLM_Fig2_{treat_num}.png"))
+    fig.write_image(
+        os.path.join(CUR_DIR, "tables_figures", f"LLM_Fig2_{treat_num}.png")
+    )
 
 # %%
 # Figure 4
@@ -115,7 +123,7 @@ fig = px.scatter(
     y="lab_supply",
     color="Treatment",
     # title="Figure 4: Mean Labor Supply by Period and Treatment",
-).update_traces(mode='lines+markers')
+).update_traces(mode="lines+markers")
 # Specify the x- and y-axis labels
 # set y axis limits
 fig.update_layout(yaxis_range=[0.7, 1.02])
@@ -130,7 +138,16 @@ fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_Fig4.png"))
 # Regression results
 
 PKNF_Table6_Col1 = [
-    "-0.007", "(0.006)", "-0.052", "(0.022)", "0.083", "(0.009)", "0.947", "(0.055)", "3344", "0.035"
+    "-0.007",
+    "(0.006)",
+    "-0.052",
+    "(0.022)",
+    "0.083",
+    "(0.009)",
+    "0.947",
+    "(0.055)",
+    "3344",
+    "0.035",
 ]
 
 # labor = constant  + post + treat + post*treat
@@ -144,10 +161,10 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     # Keep the treatment and control
     df_reg = df[(df["Treatment"] == treat) | (df["treatment"] == 1)]
     # specify an indicator for the treated group
-    model = smf.ols('lab_supply ~ Post + treated + post_treat', data=df_reg)
+    model = smf.ols("lab_supply ~ Post + treated + post_treat", data=df_reg)
     # Estimate the model
     results = model.fit()
-    reg_results_dict[treat] = [] # initialize list to store results
+    reg_results_dict[treat] = []  # initialize list to store results
     reg_results_dict[treat].append(f"{results.params["Post"]:.3f}")
     reg_results_dict[treat].append(f"({results.bse["Post"]:.3f})")
     reg_results_dict[treat].append(f"{results.params["treated"]:.3f}")
@@ -159,23 +176,46 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
 # put into dataframe
 reg_results = pd.DataFrame(reg_results_dict)
-reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+reg_results.index = [
+    "Post",
+    "",
+    "Treated",
+    "",
+    "Post*Treated",
+    "",
+    "Constant",
+    "",
+    "N",
+    "R-squared",
+]
 # Save as markdown
-reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table6.md"), index=True)
+reg_results.to_markdown(
+    os.path.join(CUR_DIR, "tables_figures", "table6.md"), index=True
+)
 reg_results.to_latex(os.path.join(CUR_DIR, "tables_figures", "table6.tex"), index=True)
 
 # Make table comparing to PKNF results to LLM results
-compare_reg_dict = {
-    "PKNF": PKNF_Table6_Col1,
-    "LLM": reg_results["Prog,Flat25"]
-}
+compare_reg_dict = {"PKNF": PKNF_Table6_Col1, "LLM": reg_results["Prog,Flat25"]}
 reg_results = pd.DataFrame(compare_reg_dict)
-reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+reg_results.index = [
+    "Post",
+    "",
+    "Treated",
+    "",
+    "Post*Treated",
+    "",
+    "Constant",
+    "",
+    "N",
+    "R-squared",
+]
 # Save as markdown
-reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "table6_compare.md"), index=True)
-reg_results.to_latex(os.path.join(CUR_DIR, "tables_figures", "table6_compare.tex"), index=True)
-
-
+reg_results.to_markdown(
+    os.path.join(CUR_DIR, "tables_figures", "table6_compare.md"), index=True
+)
+reg_results.to_latex(
+    os.path.join(CUR_DIR, "tables_figures", "table6_compare.tex"), index=True
+)
 
 
 # %% Use
@@ -192,10 +232,10 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     # Keep the treatment and control
     df_reg = df[(df["Treatment"] == treat) | (df["treatment"] == 1)]
     # specify an indicator for the treated group
-    model = smf.ols('log_income ~ Post + treated + post_treat', data=df_reg)
+    model = smf.ols("log_income ~ Post + treated + post_treat", data=df_reg)
     # Estimate the model
     results = model.fit()
-    reg_results_dict[treat] = [] # initialize list to store results
+    reg_results_dict[treat] = []  # initialize list to store results
     reg_results_dict[treat].append(f"{results.params["Post"]:.3f}")
     reg_results_dict[treat].append(f"({results.bse["Post"]:.3f})")
     reg_results_dict[treat].append(f"{results.params["treated"]:.3f}")
@@ -208,14 +248,31 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
 
 # put into dataframe
 reg_results = pd.DataFrame(reg_results_dict)
-reg_results.index = ["Post", "", "Treated", "", "Post*Treated", "", "Constant", "", "N", "R-squared"]
+reg_results.index = [
+    "Post",
+    "",
+    "Treated",
+    "",
+    "Post*Treated",
+    "",
+    "Constant",
+    "",
+    "N",
+    "R-squared",
+]
 # Save as markdown
-reg_results.to_markdown(os.path.join(CUR_DIR, "tables_figures", "income_reg_table.md"), index=True)
-reg_results.to_latex(os.path.join(CUR_DIR, "tables_figures", "income_reg_table.tex"), index=True)
+reg_results.to_markdown(
+    os.path.join(CUR_DIR, "tables_figures", "income_reg_table.md"), index=True
+)
+reg_results.to_latex(
+    os.path.join(CUR_DIR, "tables_figures", "income_reg_table.tex"), index=True
+)
 
 # %%
 # Compute ETI
-ETI = reg_results.loc["Post*Treated", :].astype(float) / np.array([0.25, 0.1, -.25, -0.1])
+ETI = reg_results.loc["Post*Treated", :].astype(float) / np.array(
+    [0.25, 0.1, -0.25, -0.1]
+)
 
 # %%
 # ETI regressions
@@ -229,10 +286,9 @@ mtr50_df1["tau"] = 0.5
 mtr50_df2 = df[(df["treatment"] == 5) | (df["Post"] == 0)]
 mtr50_df2["tau"] = 0.5
 mtr_df = pd.concat([mtr25_df1, mtr25_df2, mtr50_df1, mtr50_df2])
-model = smf.ols('log_income ~ tau', data=mtr_df)
+model = smf.ols("log_income ~ tau", data=mtr_df)
 results = model.fit()
 print(results.summary())
-
 
 
 # %%

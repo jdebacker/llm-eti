@@ -23,15 +23,18 @@ df = pickle.load(
 
 # %%
 # Parse model results to get chose income
-df["income"] = df["model_answer"].str.extract("(\d+)").astype(float)
+wage_rate = 20
+df["income"] = df["chosen_labor"] * wage_rate
 # drop if missing income
 df = df.dropna(subset=["income"])
+# drop if chosen_labor is < 1
+df = df[df["chosen_labor"] >= 1]
 
 # %%
 # Create a pre-post variable
-df["Post"] = (df["round_num"] >= 8).astype(int)
+df["Post"] = (df["round"] >= 8).astype(int)
 # create labor supply variable
-df["labor"] = (df["income"] / 20).astype(int)
+df["labor"] =  df["chosen_labor"]
 df["labor_20"] = (df["labor"] <= 20).astype(int)
 df["lab_supply"] = df["labor"] / df["max_labor"]
 # drop if labor supply > 1, this is not possible and likely error parsing data
@@ -110,8 +113,8 @@ for treat in df_bar["Treatment"].unique():
 # line plot with mean labor supply by period and treatment
 # First, groupby to find mean by treatment, period
 df_bar = (
-    df[["treatment", "lab_supply", "round_num"]]
-    .groupby(["treatment", "round_num"])
+    df[["treatment", "lab_supply", "round"]]
+    .groupby(["treatment", "round"])
     .mean()
     .reset_index()
 )
@@ -119,7 +122,7 @@ df_bar = (
 df_bar["Treatment"] = df_bar["treatment"].map(treat_dict)
 fig = px.scatter(
     df_bar,
-    x="round_num",
+    x="round",
     y="lab_supply",
     color="Treatment",
     # title="Figure 4: Mean Labor Supply by Period and Treatment",
@@ -131,7 +134,7 @@ fig.update_xaxes(title_text="Period")
 fig.update_yaxes(title_text="Labor Supply in %")
 # put a vertical dashed line at period 8
 fig.add_vline(x=7.5, line_dash="dash")
-fig.show()
+# fig.show()
 fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_Fig4.png"))
 
 # %%
@@ -304,7 +307,5 @@ fig = px.histogram(
 # update x-axis label
 fig.update_xaxes(title_text="Pre-tax Income")
 fig.update_yaxes(title_text="Count")
-fig.show()
+# fig.show()
 fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_bunching.png"))
-
-# %%

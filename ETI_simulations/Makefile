@@ -1,7 +1,7 @@
 .PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o
 
 install:
-	pip install -r requirements.txt
+	pip install -r ../requirements.txt
 
 run-simulation:
 	python cli.py run-simulation

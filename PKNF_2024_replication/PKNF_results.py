@@ -6,7 +6,20 @@ import statsmodels.formula.api as smf
 import os
 import pickle
 import plotly.express as px
+from matplotlib import pyplot as plt
 
+
+# Define parameters for matplotlib plots
+plt.rcParams['figure.figsize'] = (8, 5)
+plt.rcParams['figure.facecolor'] = '#f0f0f0'
+plt.rcParams['axes.facecolor'] = '#f0f0f0'
+plt.rcParams['axes.edgecolor'] = '#d0d0d0'
+plt.rcParams['grid.color'] = '#d0d0d0'
+plt.rcParams['grid.linestyle'] = ':'
+plt.rcParams['axes.spines.right'] = False
+plt.rcParams['axes.spines.top'] = False
+plt.rcParams['axes.grid'] = True
+plt.rcParams['axes.grid.axis'] = 'y'  # Only show horizontal grid lines
 
 # get directory of current file
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -29,6 +42,8 @@ df["income"] = df["chosen_labor"] * wage_rate
 df = df.dropna(subset=["income"])
 # drop if chosen_labor is < 1
 df = df[df["chosen_labor"] >= 1]
+# Make labor was written in terms of max income
+df["max_labor"] = df["max_labor"] / wage_rate
 
 # %%
 # Create a pre-post variable
@@ -39,6 +54,7 @@ df["labor_20"] = (df["labor"] <= 20).astype(int)
 df["lab_supply"] = df["labor"] / df["max_labor"]
 # drop if labor supply > 1, this is not possible and likely error parsing data
 df = df[df["lab_supply"] <= 1]
+
 
 # %%
 # Create Table 5
@@ -107,6 +123,55 @@ for treat in df_bar["Treatment"].unique():
     fig.write_image(
         os.path.join(CUR_DIR, "tables_figures", f"LLM_Fig2_{treat_num}.png")
     )
+#############################
+# Make same figure as above, but in Matplotlib
+#############################
+max_labor_values = sorted(df_bar["max_labor"].unique())
+post_values = sorted(df_bar["Post"].unique())
+colors = ["#f8953a", "#4c72b0"]
+bar_width = 0.35
+gap = 0.05  # gap between groups
+for treat in df_bar["Treatment"].unique():
+    # Set up the figure
+    fig, ax = plt.subplots()
+    for i, max_lab in enumerate(max_labor_values):
+        group_center = i
+        for j, post in enumerate(post_values):
+            pos = group_center - (bar_width + gap)/2 + j*(bar_width + gap)
+            df_treat = df_bar[(df_bar["max_labor"] == max_lab) &
+                            (df_bar["Post"] == post) &
+                            (df_bar["Treatment"] == treat)]
+            if not df_treat.empty:
+                ax.bar(pos,
+                    df_treat["labor"].values[0],
+                    width=bar_width,
+                    color=colors[j],
+                    alpha=0.9 if post == 0 else 1.0,
+                    label=f"Post" if post == 1 and i==0 else
+                            f"Pre" if i==0 else "",
+                    edgecolor='black',
+                    linewidth=0.5)
+    # Add dashed line for the mean
+    mean_value = df_bar[df_bar["Treatment"] == treat]["labor"].mean()
+    ax.axhline(y=mean_value, color='#808080', linestyle='--', linewidth=1.5, alpha=0.8)
+    # Add max value line
+    max_value = df_bar[df_bar["Treatment"] == treat]["labor"].max()
+    ax.axhline(y=mean_value, color='#808080', linestyle=':', linewidth=1.5, alpha=0.3)
+    ax.set_xlabel("Maximum Labor")
+    ax.set_ylabel("Labor Supply, in Units")
+    #title
+    ax.set_title(f"{treat}")
+    # set y_lim
+    ax.set_ylim(0, max_value + 0.5)
+    ax.set_xticks(np.arange(len(max_labor_values)))
+    ax.set_xticklabels(max_labor_values)
+    ax.legend()
+
+    plt.savefig(
+        os.path.join(CUR_DIR, "tables_figures", f"LLM_Fig2_{treat}_matplotlib.png"),
+    bbox_inches="tight",
+    dpi=300,
+)
 
 # %%
 # Figure 4
@@ -136,6 +201,39 @@ fig.update_yaxes(title_text="Labor Supply in %")
 fig.add_vline(x=7.5, line_dash="dash")
 # fig.show()
 fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_Fig4.png"))
+
+###########################
+# Same figure as above, but in Matplotlib
+###########################
+# Set up the figure
+fig, ax = plt.subplots()
+for treat in df_bar["Treatment"].unique():
+    # Filter the data for the current treatment
+    df_treat = df_bar[df_bar["Treatment"] == treat]
+    # Plot the data
+    ax.plot(
+        df_treat["round"],
+        df_treat["lab_supply"],
+        marker="o",
+        label=treat,
+        alpha=0.9,
+    )
+# set y axis limits
+ax.set_ylim(0.7, 1.02)
+# Add a vertical dashed line at period 8
+ax.axvline(x=7.5, color='gray', linestyle='--', linewidth=1.5, alpha=0.8)
+# Add labels and title
+ax.set_xlabel("Period")
+ax.set_ylabel("Labor Supply in %")
+# ax.set_title("Figure 4: Mean Labor Supply by Period and Treatment")
+# Add legend
+ax.legend()
+# Save the figure
+plt.savefig(
+    os.path.join(CUR_DIR, "tables_figures", "LLM_Fig4_matplotlib.png"),
+    bbox_inches="tight",
+    dpi=300,
+)
 
 # %%
 # Regression results
@@ -309,3 +407,40 @@ fig.update_xaxes(title_text="Pre-tax Income")
 fig.update_yaxes(title_text="Count")
 # fig.show()
 fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_bunching.png"))
+
+##############
+# Same figure as above, but in Matplotlib
+##############
+# Set up the figure
+fig, ax = plt.subplots()
+# Filter the data for treatment 1
+df_treat = df[df["treatment"] == 1]
+# Plot the data
+ax.hist(
+    df_treat[df_treat["Post"] == 0]["income"],
+    bins=20,
+    alpha=0.5,
+    label="Pre-Reform",
+    color="#f8953a",
+)
+ax.hist(
+    df_treat[df_treat["Post"] == 1]["income"],
+    bins=20,
+    alpha=0.5,
+    label="Post-Reform",
+    color="#4c72b0",
+)
+# Add labels and title
+ax.set_xlabel("Pre-tax Income")
+ax.set_ylabel("Count")
+# ax.set_title("Histogram of Earnings for Treatment 1")
+# Add legend
+ax.legend()
+# Save the figure
+plt.savefig(
+    os.path.join(CUR_DIR, "tables_figures", "LLM_bunching_matplotlib.png"),
+    bbox_inches="tight",
+    dpi=300,
+)
+
+# %%

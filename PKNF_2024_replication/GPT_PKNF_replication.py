@@ -100,6 +100,7 @@ class TaxBehaviorReplication:
             "max_labor": [
                 14,
                 16,
+                18,
                 20,
                 22,
                 24,
@@ -374,21 +375,25 @@ class TaxBehaviorReplication:
             for round_num in range(1, R + 1):
                 # Get tax parameters for this round
                 rate1, rate2 = self.get_tax_rates(round_num, treatment)
-                max_labor = np.random.choice(self.tax_parameterizations["max_labor"])
+                # max_labor = np.random.choice(self.tax_parameterizations["max_labor"])
+                # When using the "n" argument in the API call, need to pass all the same labor supply, so can't change
+                # Instead, we just loop over max_labor so that we get all combinations
+                # Since each round is a new chat, there's no history of the previous rounds
+                # anyway, so this shouldn't affect the results
+                for max_labor in self.tax_parameterizations["max_labor"]:
+                    result = self.simulate_labor_decision(
+                        rate1=rate1,
+                        rate2=rate2,
+                        max_labor=max_labor,
+                        num_obs=num_subjects,
+                        round_number=round_num,
+                        treatment=treatment,
+                        personality=personality,
+                    )
 
-                result = self.simulate_labor_decision(
-                    rate1=rate1,
-                    rate2=rate2,
-                    max_labor=max_labor,
-                    num_obs=num_subjects,
-                    round_number=round_num,
-                    treatment=treatment,
-                    personality=personality,
-                )
-
-                result["subject_id"] = np.arange(1, num_subjects + 1).tolist()
-                for k in results.keys():
-                    results[k].extend(result[k])
+                    result["subject_id"] = np.arange(1, num_subjects + 1).tolist()
+                    for k in results.keys():
+                        results[k].extend(result[k])
 
                 # Rate limiting
                 time.sleep(0.1)
@@ -398,11 +403,11 @@ class TaxBehaviorReplication:
 
 def main():
     # Initialize experiment
-    experiment = TaxBehaviorReplication()
+    experiment = TaxBehaviorReplication(model="gpt-4.1-mini-2025-04-14")
 
     # Run experiment
     results_df = experiment.run_full_experiment(
-        num_subjects=100,
+        num_subjects=128,
         # personality_distribution={
         #     "neutral": 0.5,
         #     "risk_averse": 0.25,
@@ -420,3 +425,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

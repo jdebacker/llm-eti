@@ -132,7 +132,9 @@ class TaxBehaviorReplication:
             + " You make decisions based on careful evaluation of options.",
         }
 
-        return personality_prompts.get(personality_type, personality_prompts["neutral"])
+        return personality_prompts.get(
+            personality_type, personality_prompts["neutral"]
+        )
 
     def generate_tax_scenario(
         self,
@@ -214,16 +216,22 @@ class TaxBehaviorReplication:
             tuple: tax rates (rate1, rate2)
 
         """
-        if treatment == 1:  # control group: faces progressive taxes in all rounds
+        if (
+            treatment == 1
+        ):  # control group: faces progressive taxes in all rounds
             rate1 = self.tax_parameterizations["rate1"][0]
             rate2 = self.tax_parameterizations["rate2"][0]
-        elif treatment == 2:  # treatment 1: moves from progressive to flat tax at 25%
+        elif (
+            treatment == 2
+        ):  # treatment 1: moves from progressive to flat tax at 25%
             rate1 = self.tax_parameterizations["rate1"][0]
             rate2 = self.tax_parameterizations["rate2"][0]
             if round_num > R_SWITCH:
                 rate1 = self.tax_parameterizations["rate1"][1]
                 rate2 = self.tax_parameterizations["rate2"][1]
-        elif treatment == 3:  # treatment 2: moves from progressive to flat tax at 50%
+        elif (
+            treatment == 3
+        ):  # treatment 2: moves from progressive to flat tax at 50%
             rate1 = self.tax_parameterizations["rate1"][0]
             rate2 = self.tax_parameterizations["rate2"][0]
             if round_num > R_SWITCH:
@@ -260,7 +268,9 @@ class TaxBehaviorReplication:
 
         """
         wage_rate = 20  # cents per task -- hardcoded for now
-        income_list = [re.findall(r"\d+", result)[0] for result in response_list]
+        income_list = [
+            re.findall(r"\d+", result)[0] for result in response_list
+        ]
         labor = [int(income) / wage_rate for income in income_list]
 
         return labor
@@ -294,7 +304,9 @@ class TaxBehaviorReplication:
 
         """
         # find the tax rates based on the round number and treatment
-        rate1, rate2 = self.get_tax_rates(round_num=round_number, treatment=treatment)
+        rate1, rate2 = self.get_tax_rates(
+            round_num=round_number, treatment=treatment
+        )
 
         # Generate the tax scenario text
         scenario_text = self.generate_tax_scenario(
@@ -391,7 +403,9 @@ class TaxBehaviorReplication:
                         personality=personality,
                     )
 
-                    result["subject_id"] = np.arange(1, num_subjects + 1).tolist()
+                    result["subject_id"] = np.arange(
+                        1, num_subjects + 1
+                    ).tolist()
                     for k in results.keys():
                         results[k].extend(result[k])
 
@@ -416,13 +430,16 @@ def main():
     )
 
     # Save results to disk as CSV and DataFrame via pickle
-    results_df.to_csv(os.path.join("..", "data", experiment.data_filename + ".csv"))
+    results_df.to_csv(
+        os.path.join("..", "data", experiment.data_filename + ".csv")
+    )
     pickle.dump(
         results_df,
-        open(os.path.join("..", "data", experiment.data_filename + ".pkl"), "wb"),
+        open(
+            os.path.join("..", "data", experiment.data_filename + ".pkl"), "wb"
+        ),
     )
 
 
 if __name__ == "__main__":
     main()
-

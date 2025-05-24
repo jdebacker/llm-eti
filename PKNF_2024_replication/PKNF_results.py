@@ -11,8 +11,8 @@ from matplotlib import pyplot as plt
 
 # Define parameters for matplotlib plots
 plt.rcParams['figure.figsize'] = (8, 5)
-plt.rcParams['figure.facecolor'] = '#f0f0f0'
-plt.rcParams['axes.facecolor'] = '#f0f0f0'
+plt.rcParams['figure.facecolor'] = '#ffffff'
+plt.rcParams['axes.facecolor'] = '#ffffff'
 plt.rcParams['axes.edgecolor'] = '#d0d0d0'
 plt.rcParams['grid.color'] = '#d0d0d0'
 plt.rcParams['grid.linestyle'] = ':'
@@ -30,31 +30,38 @@ px.defaults.template = "plotly_white"
 # %%
 # Read in data
 DATA_FILENAME = "PKNF_replication_results_gpt-4o-mini"
-df = pickle.load(
+df_raw = pickle.load(
     open(os.path.join(CUR_DIR, "..", "data", DATA_FILENAME + ".pkl"), "rb")
 )
 
 # %%
-# Parse model results to get chose income
-wage_rate = 20
-df["income"] = df["chosen_labor"] * wage_rate
-# drop if missing income
-df = df.dropna(subset=["income"])
-# drop if chosen_labor is < 1
-df = df[df["chosen_labor"] >= 1]
-# Make labor was written in terms of max income
-df["max_labor"] = df["max_labor"] / wage_rate
+def clean_data(df):
+    """
+    Applies some cleaning to the data
+    """
+    print("Cleaning data...")
+    # Parse model results to get chose income
+    wage_rate = 20
+    df["income"] = df["chosen_labor"] * wage_rate
+    # drop if missing income
+    df = df.dropna(subset=["income"])
+    # drop if chosen_labor is < 1
+    df = df[df["chosen_labor"] >= 1]
+    # Make labor was written in terms of max income
+    df["max_labor"] = df["max_labor"] / wage_rate
 
-# %%
-# Create a pre-post variable
-df["Post"] = (df["round"] >= 8).astype(int)
-# create labor supply variable
-df["labor"] =  df["chosen_labor"]
-df["labor_20"] = (df["labor"] <= 20).astype(int)
-df["lab_supply"] = df["labor"] / df["max_labor"]
-# drop if labor supply > 1, this is not possible and likely error parsing data
-df = df[df["lab_supply"] <= 1]
+    # Create a pre-post variable
+    df["Post"] = (df["round"] >= 8).astype(int)
+    # create labor supply variable
+    df["labor"] =  df["chosen_labor"]
+    df["labor_20"] = (df["labor"] <= 20).astype(int)
+    df["lab_supply"] = df["labor"] / df["max_labor"]
+    # drop if labor supply > 1, this is not possible and likely error parsing data
+    df = df[df["lab_supply"] <= 1]
 
+    return df
+
+df = clean_data(df_raw)
 
 # %%
 # Create Table 5
@@ -221,7 +228,7 @@ for treat in df_bar["Treatment"].unique():
 # set y axis limits
 ax.set_ylim(0.7, 1.02)
 # Add a vertical dashed line at period 8
-ax.axvline(x=7.5, color='gray', linestyle='--', linewidth=1.5, alpha=0.8)
+ax.axvline(x=8, color='gray', linestyle='--', linewidth=1.5, alpha=0.8)
 # Add labels and title
 ax.set_xlabel("Period")
 ax.set_ylabel("Labor Supply in %")
@@ -394,13 +401,13 @@ print(results.summary())
 
 # %%
 # bunching plots
-# plot histogram by earnings for treatment 1
+# plot histogram by earnings for treatment 2
 fig = px.histogram(
-    df[df["treatment"] == 1],
+    df[df["treatment"] == 2],
     x="income",
     color="Post",
     nbins=100,
-    # title="Histogram of Earnings for Treatment 1",
+    # title="Histogram of Earnings for Treatment 2",
 )
 # update x-axis label
 fig.update_xaxes(title_text="Pre-tax Income")
@@ -413,26 +420,28 @@ fig.write_image(os.path.join(CUR_DIR, "tables_figures", "LLM_bunching.png"))
 ##############
 # Set up the figure
 fig, ax = plt.subplots()
-# Filter the data for treatment 1
-df_treat = df[df["treatment"] == 1]
+# Filter the data for treatment 2
+df_treat = df[df["treatment"] == 2]
 # Plot the data
 ax.hist(
     df_treat[df_treat["Post"] == 0]["income"],
     bins=20,
     alpha=0.5,
-    label="Pre-Reform",
+    density=True,
+    label="Prog",
     color="#f8953a",
 )
 ax.hist(
     df_treat[df_treat["Post"] == 1]["income"],
     bins=20,
     alpha=0.5,
-    label="Post-Reform",
+    density=True,
+    label="Flat25",
     color="#4c72b0",
 )
 # Add labels and title
 ax.set_xlabel("Pre-tax Income")
-ax.set_ylabel("Count")
+ax.set_ylabel("Density")
 # ax.set_title("Histogram of Earnings for Treatment 1")
 # Add legend
 ax.legend()
@@ -442,5 +451,61 @@ plt.savefig(
     bbox_inches="tight",
     dpi=300,
 )
+
+# %%
+# create datasets for bunching estimation in R
+# There will be one CSV file per model and per 40/50 top rate
+# rows will be chosen_labor values, columns will be the treatment
+for model in ["claude-3-haiku-20240307", "gpt-4.1-mini-2025-04-14", "gpt-4o-mini"]:
+    filename= f"PKNF_modified_40pct_results_{model}.csv"
+    df = pd.read_csv(
+        os.path.join(CUR_DIR, "..", "data", filename)
+    )
+    df = clean_data(df.copy())
+    df = df[["treatment", "Post", "income"]]
+    # df_counts = df.groupby(["treatment", "Post", "income"])["subject_id"].count().reset_index()
+    # # rename subject_id to counts
+    # df_counts = df_counts.rename(columns={"subject_id": "counts"})
+
+    df.to_csv(
+        os.path.join(CUR_DIR, "..", "data", f"PKNF_40_bunching_{model}.csv"),
+        index=False,
+    )
+    # make a bunching plot for each treatment
+    # Set up the figure
+    fig, ax = plt.subplots()
+    # Filter the data for treatment 2
+    df_treat = df[df["treatment"] == 2]
+    # Plot the data
+    ax.hist(
+        df_treat[df_treat["Post"] == 0]["income"],
+        bins=20,
+        alpha=0.5,
+        density=True,
+        label="Prog",
+        color="#f8953a",
+    )
+    ax.hist(
+        df_treat[df_treat["Post"] == 1]["income"],
+        bins=20,
+        alpha=0.5,
+        density=True,
+        label="Flat25",
+        color="#4c72b0",
+    )
+    # Add labels and title
+    ax.set_xlabel("Pre-tax Income")
+    ax.set_ylabel("Density")
+    # ax.set_title("Histogram of Earnings for Treatment 1")
+    # Add legend
+    ax.legend()
+    # Save the figure
+    plt.savefig(
+        os.path.join(CUR_DIR, "tables_figures", f"LLM_bunching_40pct_{model}_matplotlib.png"),
+        bbox_inches="tight",
+        dpi=300,
+    )
+
+# do for PKNF with 50% top rate...
 
 # %%

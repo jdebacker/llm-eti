@@ -13,7 +13,9 @@ def clean_data(df: pd.DataFrame) -> pd.DataFrame:
     reg_df["mtr_change"] = pd.to_numeric(
         reg_df["new_rate"], errors="coerce"
     ) - pd.to_numeric(reg_df["prior_rate"], errors="coerce")
-    reg_df["implied_eti"] = pd.to_numeric(reg_df["implied_eti"], errors="coerce")
+    reg_df["implied_eti"] = pd.to_numeric(
+        reg_df["implied_eti"], errors="coerce"
+    )
     reg_df["abs_mtr_change"] = np.abs(reg_df.mtr_change)
 
     # Drop any invalid values

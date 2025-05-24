@@ -15,7 +15,9 @@ def run_bulk_analysis(
     )
 
     # Calculate average ETI by income level
-    avg_etis = results_df.groupby("Broad Income")["Implied ETI"].mean().reset_index()
+    avg_etis = (
+        results_df.groupby("Broad Income")["Implied ETI"].mean().reset_index()
+    )
 
     # Run regression
     X = avg_etis[["Broad Income"]]

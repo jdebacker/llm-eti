@@ -132,7 +132,9 @@ def run_simulation(
     """Run bulk tax policy simulation"""
 
     if not Config.OPENAI_API_KEY:
-        raise click.ClickException("OPENAI_API_KEY not found in environment variables")
+        raise click.ClickException(
+            "OPENAI_API_KEY not found in environment variables"
+        )
 
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

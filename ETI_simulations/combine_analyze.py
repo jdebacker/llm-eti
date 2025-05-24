@@ -20,7 +20,9 @@ def plot_model_comparison(combined_df: pd.DataFrame, output_dir: Path):
 
     # ETI by Income Level and Model
     plt.figure(figsize=(12, 6))
-    sns.boxplot(data=combined_df, x="broad_income", y="implied_eti", hue="model")
+    sns.boxplot(
+        data=combined_df, x="broad_income", y="implied_eti", hue="model"
+    )
     plt.title("ETI Distribution by Income Level and Model")
     plt.xlabel("Broad Income")
     plt.ylabel("Implied ETI")
@@ -117,13 +119,21 @@ def combine_and_analyze(mini_path, full_path, output):
     combined_df = pd.concat([mini_df, full_df], ignore_index=True)
 
     # Calculate MTR change for visualization
-    combined_df["mtr_change"] = combined_df["new_rate"] - combined_df["prior_rate"]
+    combined_df["mtr_change"] = (
+        combined_df["new_rate"] - combined_df["prior_rate"]
+    )
     combined_df["abs_mtr_change"] = np.abs(combined_df["mtr_change"])
 
     # Remove extreme outliers for visualization
     viz_df = combined_df[
-        (combined_df["implied_eti"] >= combined_df["implied_eti"].quantile(0.01))
-        & (combined_df["implied_eti"] <= combined_df["implied_eti"].quantile(0.99))
+        (
+            combined_df["implied_eti"]
+            >= combined_df["implied_eti"].quantile(0.01)
+        )
+        & (
+            combined_df["implied_eti"]
+            <= combined_df["implied_eti"].quantile(0.99)
+        )
     ].copy()
 
     # Save combined dataset
@@ -136,7 +146,9 @@ def combine_and_analyze(mini_path, full_path, output):
 
     # Save summary statistics
     save_summary_stats(combined_df, output_dir)
-    print(f"Summary statistics saved to {output_dir}/model_comparison_summary.json")
+    print(
+        f"Summary statistics saved to {output_dir}/model_comparison_summary.json"
+    )
 
     # Run regression analysis
     _ = analyze_eti_heterogeneity(combined_df, output_dir)

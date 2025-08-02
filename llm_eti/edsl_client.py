@@ -140,7 +140,11 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
         Returns:
             Survey results
         """
-        model = Model(self.model)
+        # Handle model creation with service names for specific providers
+        if self.model.startswith("gemini-"):
+            model = Model(self.model, service_name="google")
+        else:
+            model = Model(self.model)
 
         if agent:
             job = Jobs(survey=survey, agents=[agent], models=[model])

@@ -63,22 +63,36 @@ def main():
     # 1. ETI Distribution
     plt.figure(figsize=(12, 6))
     plt.subplot(1, 2, 1)
-    if "implied_eti" in gs_4o.columns:
-        plt.hist(gs_4o["implied_eti"], bins=50, alpha=0.7, label="GPT-4o")
+    if "implied_eti" in gs_4o.columns and len(gs_4o) > 0:
+        # Check if we have valid ETI data
+        eti_data = gs_4o["implied_eti"].dropna()
+        if len(eti_data) > 0:
+            plt.hist(eti_data, bins=min(50, max(5, len(eti_data) // 2)), alpha=0.7, label="GPT-4o")
+        else:
+            plt.text(0.5, 0.5, "No ETI data available", ha="center", va="center", transform=plt.gca().transAxes)
+    else:
+        plt.text(0.5, 0.5, "No ETI data available", ha="center", va="center", transform=plt.gca().transAxes)
     plt.xlabel("ETI")
     plt.ylabel("Frequency")
     plt.title("GPT-4o: ETI Distribution")
     plt.legend()
 
     plt.subplot(1, 2, 2)
-    if "implied_eti" in gs_mini.columns:
-        plt.hist(
-            gs_mini["implied_eti"],
-            bins=50,
-            alpha=0.7,
-            label="GPT-4o-mini",
-            color="orange",
-        )
+    if "implied_eti" in gs_mini.columns and len(gs_mini) > 0:
+        # Check if we have valid ETI data
+        eti_data = gs_mini["implied_eti"].dropna()
+        if len(eti_data) > 0:
+            plt.hist(
+                eti_data,
+                bins=min(50, max(5, len(eti_data) // 2)),
+                alpha=0.7,
+                label="GPT-4o-mini",
+                color="orange",
+            )
+        else:
+            plt.text(0.5, 0.5, "No ETI data available", ha="center", va="center", transform=plt.gca().transAxes)
+    else:
+        plt.text(0.5, 0.5, "No ETI data available", ha="center", va="center", transform=plt.gca().transAxes)
     plt.xlabel("ETI")
     plt.ylabel("Frequency")
     plt.title("GPT-4o-mini: ETI Distribution")
@@ -89,12 +103,27 @@ def main():
     plt.close()
 
     # 2. ETI by Income
-    if "broad_income" in gs_4o.columns and "implied_eti" in gs_4o.columns:
-        combined_df = pd.concat(
-            [gs_4o.assign(model="GPT-4o"), gs_mini.assign(model="GPT-4o-mini")]
-        )
-
-        plot_eti_by_income(combined_df, output_dir=figures_dir)
+    if "broad_income" in gs_4o.columns and "implied_eti" in gs_4o.columns and len(gs_4o) > 0:
+        # Check if we have enough data to plot
+        if len(gs_4o) > 0 and len(gs_mini) > 0:
+            combined_df = pd.concat(
+                [gs_4o.assign(model="GPT-4o"), gs_mini.assign(model="GPT-4o-mini")]
+            )
+            # Only plot if we have sufficient data
+            if len(combined_df) > 0 and combined_df["implied_eti"].notna().any():
+                try:
+                    plot_eti_by_income(combined_df, output_dir=figures_dir)
+                except Exception as e:
+                    print(f"Warning: Could not generate ETI by income plot: {e}")
+                    # Create placeholder
+                    plt.figure(figsize=(8, 6))
+                    plt.text(0.5, 0.5, "Insufficient data for ETI by income plot", 
+                            ha="center", va="center", transform=plt.gca().transAxes)
+                    plt.axis("off")
+                    plt.savefig(figures_dir / "eti_by_income.png", dpi=150, bbox_inches="tight")
+                    plt.close()
+        else:
+            print("Warning: Not enough data to create ETI by income plot")
 
     # 3. Placeholder for other figures
     # These would be generated from actual simulation data

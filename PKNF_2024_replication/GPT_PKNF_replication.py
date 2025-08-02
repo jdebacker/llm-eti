@@ -14,21 +14,25 @@ This Python script accesses the OpenAI API to get responses from
 OpenAI's GPT model
 """
 # %%
-# Get api key from file or prompt user for it
-# Check for a file named "gpt_api_key.txt" in the current directory
-if os.path.exists(os.path.join("gpt_api_key.txt")):
-    with open(os.path.join("gpt_api_key.txt"), "r") as file:
-        API_KEY = str(file.read().strip())
-else:  # if file not exist, prompt user for token
-    try:
-        API_KEY = input(
-            "Please enter your UN API token (press return if you do not have one): "
-        )
-        # write the API_KEY to a file to find in the future
-        with open(os.path.join("gpt_api_key.txt"), "w") as file:
-            file.write(API_KEY)
-    except EOFError:
-        API_KEY = ""
+# Get api key from environment, file, or prompt user
+# First check environment variable
+API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not API_KEY:
+    # Check for a file named "gpt_api_key.txt" in the current directory
+    if os.path.exists(os.path.join("gpt_api_key.txt")):
+        with open(os.path.join("gpt_api_key.txt"), "r") as file:
+            API_KEY = str(file.read().strip())
+    else:  # if file not exist, prompt user for token
+        try:
+            API_KEY = input(
+                "Please enter your OpenAI API key (press return if you do not have one): "
+            )
+            # write the API_KEY to a file to find in the future
+            with open(os.path.join("gpt_api_key.txt"), "w") as file:
+                file.write(API_KEY)
+        except EOFError:
+            API_KEY = ""
 
 # %%
 # make sure the data directory exists

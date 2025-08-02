@@ -1,4 +1,4 @@
-.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book
+.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint
 
 # Install dependencies using uv
 install:
@@ -59,6 +59,17 @@ clean:
 	rm -rf results/*
 	cd book && make clean-all
 
+# Format code
+format:
+	uv run black .
+	uv run ruff check --fix .
+
+# Lint code
+lint:
+	uv run black --check .
+	uv run ruff check .
+	uv run mypy . --ignore-missing-imports
+
 # Help
 help:
 	@echo "Simulation commands:"
@@ -72,5 +83,9 @@ help:
 	@echo "  book-serve            - Serve book locally"
 	@echo "  book-pdf              - Generate PDF"
 	@echo "  book-test             - Run test pipeline with book"
+	@echo ""
+	@echo "Development commands:"
+	@echo "  format                - Format code with black and ruff"
+	@echo "  lint                  - Run linters"
 	@echo ""
 	@echo "  clean                 - Clean all generated files"

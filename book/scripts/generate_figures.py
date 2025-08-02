@@ -78,11 +78,7 @@ def main():
             [gs_4o.assign(model="GPT-4o"), gs_mini.assign(model="GPT-4o-mini")]
         )
 
-        plt.figure(figsize=(10, 6))
-        plot_eti_by_income(
-            combined_df, save_path=str(figures_dir / "eti_by_income.png")
-        )
-        plt.close()
+        plot_eti_by_income(combined_df, output_dir=figures_dir)
 
     # 3. Placeholder for other figures
     # These would be generated from actual simulation data

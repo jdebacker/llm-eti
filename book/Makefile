@@ -3,8 +3,15 @@
 # Variables
 PYTHON := python3
 UV := uv
-# Use Python 3.12 for compatibility with dependencies
-export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+
+# Use Python 3.12 for compatibility
+# On macOS with Homebrew, use the specific path; otherwise let uv find it
+ifeq ($(shell uname -s),Darwin)
+    ifneq ($(wildcard /opt/homebrew/opt/python@3.12/bin/python3.12),)
+        export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+    endif
+endif
+
 BOOK_DIR := .
 BUILD_DIR := _build
 SCRIPTS_DIR := scripts

@@ -1,7 +1,12 @@
 .PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint
 
 # Use Python 3.12 for compatibility
-export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+# On macOS with Homebrew, use the specific path; otherwise let uv find it
+ifeq ($(shell uname -s),Darwin)
+    ifneq ($(wildcard /opt/homebrew/opt/python@3.12/bin/python3.12),)
+        export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+    endif
+endif
 
 # Install dependencies using uv
 install:

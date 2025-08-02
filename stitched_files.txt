@@ -1,0 +1,1323 @@
+# File: ./bulk_analysis.py
+from simulation_engine import SimulationParams, TaxSimulation
+from sklearn.linear_model import LinearRegression
+
+
+def run_bulk_analysis(
+    gpt_client, min_income=50000, max_income=200000, income_step=10000
+):
+    params = SimulationParams(
+        min_rate=0.15, max_rate=0.35, step_size=0.02, responses_per_rate=10
+    )
+
+    simulation = TaxSimulation(gpt_client, params)
+    results_df = simulation.run_bulk_simulation(
+        min_income, max_income, income_step, 0.25
+    )
+
+    # Calculate average ETI by income level
+    avg_etis = (
+        results_df.groupby("Broad Income")["Implied ETI"].mean().reset_index()
+    )
+
+    # Run regression
+    X = avg_etis[["Broad Income"]]
+    y = avg_etis["Implied ETI"]
+    reg = LinearRegression().fit(X, y)
+
+    return {
+        "results": results_df,
+        "avg_etis": avg_etis,
+        "regression": {
+            "coefficient": reg.coef_[0],
+            "intercept": reg.intercept_,
+            "r2": reg.score(X, y),
+        },
+    }
+
+
+# File: ./table_utils.py
+def format_coef(coef, se, pval):
+    """Format coefficient with stars and standard error."""
+    stars = ""
+    if pval < 0.01:
+        stars = "^{***}"
+    elif pval < 0.05:
+        stars = "^{**}"
+    elif pval < 0.1:
+        stars = "^{*}"
+    return f"${coef:.3f}{stars}$ \\\\ ({se:.3f})"
+
+
+def generate_latex_table(results_dict: dict, summary_stats: dict) -> str:
+    """Generate LaTeX table comparing both models."""
+    models = ["gpt-4o", "gpt-4o-mini"]
+
+    latex = [
+        "\\begin{table}[!htbp] \\centering",
+        "  \\caption{Simulated Elasticity of Taxable Income by Model}",
+        "\\begin{tabular}{lcc}",
+        "\\\\[-1.8ex]\\hline",
+        "\\hline \\\\[-1.8ex]",
+        " & GPT-4o & GPT-4o-mini \\\\",
+        "\\hline \\\\[-1.8ex]",
+    ]
+
+    # Panel A: Summary Statistics
+    latex.extend(
+        [
+            "\\multicolumn{3}{l}{\\textbf{Panel A: Summary Statistics}} \\\\",
+            "\\\\[-1.8ex]",
+        ]
+    )
+
+    # Get model results
+    model_results = {
+        model: next(r for r in results_dict if r["Model"] == model)
+        for model in models
+    }
+
+    # Add summary stats
+    stats_rows = [
+        ("Mean ETI", lambda m: f"${summary_stats.loc[m, 'Mean ETI']:.3f}$"),
+        (
+            "Median ETI",
+            lambda m: f"${summary_stats.loc[m, 'Median ETI']:.3f}$",
+        ),
+        (
+            "Share with no response",
+            lambda m: f"{summary_stats.loc[m, 'Share No Response']:.1%}",
+        ),
+        (
+            "Standard deviation",
+            lambda m: f"{summary_stats.loc[m, 'Std ETI']:.3f}",
+        ),
+        (
+            "25th percentile ETI",
+            lambda m: f"${summary_stats.loc[m, 'P25 ETI']:.3f}$",
+        ),
+        (
+            "75th percentile ETI",
+            lambda m: f"${summary_stats.loc[m, 'P75 ETI']:.3f}$",
+        ),
+        (
+            "Number of responses",
+            lambda m: f"{int(summary_stats.loc[m, 'N']):,}",
+        ),
+    ]
+
+    for label, formatter in stats_rows:
+        values = [formatter(m) for m in models]
+        latex.append(f"{label} & {values[0]} & {values[1]} \\\\")
+
+    # Panel B: Regression Results
+    latex.extend(
+        [
+            "\\\\[-1.8ex]",
+            "\\multicolumn{3}{l}{\\textbf{Panel B: Regression Coefficients}} \\\\",
+            "\\\\[-1.8ex]",
+        ]
+    )
+
+    # Add regression results
+    var_names = {
+        "const": "Constant",
+        "income_100k": "Income (\\$100k)",
+        "abs_mtr_change": "Absolute MTR Change",
+        "income_abs_mtr_interact": "Income $\\times$ Absolute MTR Change",
+    }
+
+    # Use model 3 (full specification) for each model
+    for var in var_names:
+        row = [var_names[var]]
+        for model in models:
+            reg = model_results[model]["regs"][
+                2
+            ]  # Use third regression (full model)
+            if var in reg.params.index:
+                coef = reg.params[var]
+                se = reg.bse[var]
+                pval = reg.pvalues[var]
+                row.append(format_coef(coef, se, pval))
+            else:
+                row.append("")
+        latex.append(" & ".join(row) + " \\\\")
+
+    # Add R-squared
+    r2_values = [model_results[m]["regs"][2].rsquared for m in models]
+    latex.append(f"$R^2$ & {r2_values[0]:.3f} & {r2_values[1]:.3f} \\\\")
+
+    # Close table with detailed notes
+    latex.extend(
+        [
+            "\\hline",
+            "\\hline \\\\[-1.8ex]",
+            "\\multicolumn{3}{p{0.95\\linewidth}}{\\textit{Notes:} ",
+            "Heteroskedasticity-robust standard errors in parentheses. ",
+            "Panel B reports coefficients from regressions of ETI on income (in \\$100k), marginal tax rate changes (in percentage points), ",
+            "and their interaction.} \\\\",
+            "\\multicolumn{3}{r}{$^{***}p<0.01$, $^{**}p<0.05$, $^{*}p<0.1$} \\\\",
+            "\\end{tabular}",
+            "\\end{table}",
+        ]
+    )
+
+    return "\n".join(latex)
+
+
+# File: ./config.py
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+
+class Config:
+    # Base paths
+    ROOT_DIR = Path(__file__).parent
+    DATA_DIR = ROOT_DIR / "data"
+    RESULTS_DIR = ROOT_DIR / "results"
+
+    # Create directories if they don't exist
+    DATA_DIR.mkdir(exist_ok=True)
+    RESULTS_DIR.mkdir(exist_ok=True)
+
+    # API Configuration
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+    # Default simulation parameters
+    DEFAULT_PARAMS = {
+        "min_income": 50000,
+        "max_income": 200000,
+        "income_step": 10000,
+        "min_rate": 0.15,
+        "max_rate": 0.35,
+        "rate_step": 0.02,
+        "responses_per_rate": 100,
+        "prior_rate": 0.25,
+        "taxable_income_ratio": 0.75,
+        "model": "gpt-4o-mini",
+    }
+
+
+# File: ./analysis.py
+from pathlib import Path
+import pandas as pd
+from data_utils import clean_data, calculate_summary_stats, print_diagnostics
+from regression_utils import run_model_regressions
+from table_utils import generate_latex_table
+from plotting import create_all_plots
+
+
+def analyze_eti_heterogeneity(df: pd.DataFrame, output_dir: Path) -> dict:
+    """Run regressions to analyze ETI heterogeneity."""
+    # Clean and prepare data
+    reg_df = clean_data(df)
+
+    # Calculate summary statistics
+    summary_stats = calculate_summary_stats(reg_df)
+
+    # Print diagnostics
+    print_diagnostics(df, reg_df, summary_stats)
+
+    results = []
+
+    # Run separate regressions for each model
+    for model in reg_df["model"].unique():
+        model_df = reg_df[reg_df["model"] == model].copy()
+        result = run_model_regressions(model_df, model)
+        if result:
+            results.append(result)
+
+    if results:
+        # Generate combined LaTeX table
+        latex_table = generate_latex_table(results, summary_stats)
+        with open(output_dir / "regression_table.tex", "w") as f:
+            f.write(latex_table)
+
+        # Save summary statistics
+        summary_stats.to_csv(output_dir / "summary_stats.csv")
+
+        # Create plots
+        create_all_plots(reg_df, output_dir)
+
+    return {"results": results, "summary_stats": summary_stats}
+
+
+# File: ./combine_analyze.py
+import pandas as pd
+import click
+from pathlib import Path
+from analysis import analyze_eti_heterogeneity
+import json
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+import numpy as np
+
+
+def load_simulation_results(path: Path) -> pd.DataFrame:
+    """Load raw responses from a simulation directory."""
+    return pd.read_csv(path / "raw_responses.csv")
+
+
+def plot_model_comparison(combined_df: pd.DataFrame, output_dir: Path):
+    """Generate comparison plots between models."""
+    plt.style.use("default")
+
+    # ETI by Income Level and Model
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(
+        data=combined_df, x="broad_income", y="implied_eti", hue="model"
+    )
+    plt.title("ETI Distribution by Income Level and Model")
+    plt.xlabel("Broad Income")
+    plt.ylabel("Implied ETI")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_income_model.png")
+    plt.close()
+
+    # ETI by Tax Rate Change and Model
+    plt.figure(figsize=(12, 6))
+    sns.scatterplot(
+        data=combined_df,
+        x="mtr_change",
+        y="implied_eti",
+        hue="model",
+        alpha=0.6,
+    )
+    plt.title("ETI vs Tax Rate Change by Model")
+    plt.xlabel("Change in Marginal Tax Rate")
+    plt.ylabel("Implied ETI")
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_mtr_model.png")
+    plt.close()
+
+
+def save_summary_stats(df: pd.DataFrame, output_dir: Path):
+    """Save summary statistics by model."""
+    summary_dict = {}
+    for model in df["model"].unique():
+        model_df = df[df["model"] == model]
+        summary_dict[model] = {
+            "eti_stats": {
+                "count": int(model_df["implied_eti"].count()),
+                "mean": float(model_df["implied_eti"].mean()),
+                "std": float(model_df["implied_eti"].std()),
+                "min": float(model_df["implied_eti"].min()),
+                "max": float(model_df["implied_eti"].max()),
+            },
+            "income_stats": {
+                "mean": float(model_df["parsed_income"].mean()),
+                "std": float(model_df["parsed_income"].std()),
+            },
+        }
+
+    with open(output_dir / "model_comparison_summary.json", "w") as f:
+        json.dump(summary_dict, f, indent=2)
+
+
+def print_summary_stats(df: pd.DataFrame):
+    """Print key summary statistics."""
+    print("\nKey Findings:")
+    print("-------------")
+    for model in df["model"].unique():
+        model_df = df[df["model"] == model]
+        print(f"\n{model}:")
+        print(f"Sample size: {len(model_df):,}")
+        print(f"Average ETI: {model_df['implied_eti'].mean():.3f}")
+        print(f"Standard Deviation: {model_df['implied_eti'].std():.3f}")
+        print(f"Median ETI: {model_df['implied_eti'].median():.3f}")
+        print(
+            f"Income range: ${model_df['broad_income'].min():,.0f} - ${model_df['broad_income'].max():,.0f}"
+        )
+
+
+@click.command()
+@click.argument("mini_path", type=click.Path(exists=True))
+@click.argument("full_path", type=click.Path(exists=True))
+@click.option(
+    "--output",
+    default=None,
+    help="Output directory name (defaults to timestamp)",
+)
+def combine_and_analyze(mini_path, full_path, output):
+    """Combine and analyze results from GPT-4o-mini and GPT-4o simulations."""
+
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Path("results") / (output or f"combined_analysis_{timestamp}")
+    output_dir.mkdir(exist_ok=True, parents=True)
+
+    # Load both sets of results
+    mini_df = load_simulation_results(Path(mini_path))
+    full_df = load_simulation_results(Path(full_path))
+
+    print(f"\nLoaded data:")
+    print(f"GPT-4o-mini: {len(mini_df):,} observations")
+    print(f"GPT-4o: {len(full_df):,} observations")
+
+    # Add model indicators
+    mini_df["model"] = "gpt-4o-mini"
+    full_df["model"] = "gpt-4o"
+
+    # Combine results
+    combined_df = pd.concat([mini_df, full_df], ignore_index=True)
+
+    # Calculate MTR change for visualization
+    combined_df["mtr_change"] = (
+        combined_df["new_rate"] - combined_df["prior_rate"]
+    )
+    combined_df["abs_mtr_change"] = np.abs(combined_df["mtr_change"])
+
+    # Remove extreme outliers for visualization
+    viz_df = combined_df[
+        (
+            combined_df["implied_eti"]
+            >= combined_df["implied_eti"].quantile(0.01)
+        )
+        & (
+            combined_df["implied_eti"]
+            <= combined_df["implied_eti"].quantile(0.99)
+        )
+    ].copy()
+
+    # Save combined dataset
+    combined_df.to_csv(output_dir / "combined_results.csv", index=False)
+    print(f"\nCombined results saved to {output_dir}/combined_results.csv")
+
+    # Generate comparison plots
+    plot_model_comparison(viz_df, output_dir)
+    print(f"Comparison plots saved to {output_dir}")
+
+    # Save summary statistics
+    save_summary_stats(combined_df, output_dir)
+    print(
+        f"Summary statistics saved to {output_dir}/model_comparison_summary.json"
+    )
+
+    # Run regression analysis
+    _ = analyze_eti_heterogeneity(combined_df, output_dir)
+    print(f"Regression results saved to {output_dir}/regression_table.tex")
+
+    # Print summary statistics
+    print_summary_stats(combined_df)
+
+
+if __name__ == "__main__":
+    combine_and_analyze()
+
+
+# File: ./plotting.py
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+import pandas as pd
+from pathlib import Path
+
+
+def setup_plotting():
+    """Set up plotting style."""
+    plt.style.use("default")
+    plt.rcParams["figure.dpi"] = 300
+    plt.rcParams["savefig.dpi"] = 300
+    plt.rcParams["font.size"] = 12
+
+
+def plot_eti_distribution(df: pd.DataFrame, output_dir: Path):
+    """Plot ETI distribution by model."""
+    plt.figure(figsize=(10, 6))
+    for model in df["model"].unique():
+        model_df = df[df["model"] == model]
+        # Clip to reasonable range for visualization
+        sns.kdeplot(data=model_df["implied_eti"].clip(-2, 2), label=model)
+    plt.title("Distribution of ETIs by Model")
+    plt.xlabel("ETI")
+    plt.ylabel("Density")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_distribution.png")
+    plt.close()
+
+
+def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
+    """Plot ETI by income level for each model."""
+    plt.figure(figsize=(12, 6))
+
+    # Create income bins
+    income_bins = np.arange(50000, 210000, 25000)
+    df["income_bin"] = pd.cut(
+        df["broad_income"], bins=income_bins, labels=income_bins[:-1]
+    )
+
+    # Calculate means by bin and model
+    means = (
+        df.groupby(["model", "income_bin"], observed=True)["implied_eti"]
+        .mean()
+        .reset_index()
+    )
+
+    # Plot with confidence intervals
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    for model in df["model"].unique():
+        model_data = means[means["model"] == model]
+
+        # Add confidence intervals
+        model_df = df[df["model"] == model]
+        ci_data = []
+        for bin_val in income_bins[:-1]:
+            bin_data = model_df[model_df["income_bin"] == bin_val][
+                "implied_eti"
+            ]
+            ci = np.percentile(bin_data, [2.5, 97.5])
+            ci_data.append({"bin": bin_val, "lower": ci[0], "upper": ci[1]})
+        ci_df = pd.DataFrame(ci_data)
+
+        # Plot mean and CI
+        ax.plot(
+            model_data["income_bin"],
+            model_data["implied_eti"],
+            marker="o",
+            label=f"{model} (mean)",
+        )
+        ax.fill_between(
+            ci_df["bin"], ci_df["lower"], ci_df["upper"], alpha=0.2
+        )
+
+    plt.title("ETI by Income Level")
+    plt.xlabel("Income")
+    plt.ylabel("ETI")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.xticks(
+        income_bins[:-1],
+        [f"${x/1000:.0f}k" for x in income_bins[:-1]],
+        rotation=45,
+    )
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_income.png")
+    plt.close()
+
+
+def plot_response_patterns(df: pd.DataFrame, output_dir: Path):
+    """Plot response patterns."""
+    df["mtr_change"] = df["new_rate"] - df["prior_rate"]
+    df["any_response"] = df["implied_eti"] != 0
+
+    # Plot 1: Response rate by tax change
+    plt.figure(figsize=(12, 6))
+    response_rates = (
+        df.groupby(["model", "mtr_change"], observed=True)["any_response"]
+        .mean()
+        .reset_index()
+    )
+
+    for model in df["model"].unique():
+        model_data = response_rates[response_rates["model"] == model]
+        plt.plot(
+            model_data["mtr_change"],
+            model_data["any_response"],
+            marker="o",
+            label=model,
+        )
+
+    plt.title("Behavioral Response Rate by Tax Rate Change")
+    plt.xlabel("Change in Marginal Tax Rate (pp)")
+    plt.ylabel("Share Responding")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(output_dir / "response_rate.png")
+    plt.close()
+
+    # Plot 2: Mean ETI by tax change direction
+    plt.figure(figsize=(12, 6))
+    df["tax_change_dir"] = pd.cut(
+        df["mtr_change"],
+        bins=[-np.inf, -0.001, 0.001, np.inf],
+        labels=["Tax Cut", "No Change", "Tax Increase"],
+    )
+
+    sns.boxplot(data=df, x="tax_change_dir", y="implied_eti", hue="model")
+    plt.title("ETI Distribution by Tax Change Direction")
+    plt.xlabel("Tax Rate Change")
+    plt.ylabel("ETI")
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_tax_direction.png")
+    plt.close()
+
+
+def create_all_plots(df: pd.DataFrame, output_dir: Path):
+    """Create all plots."""
+    setup_plotting()
+    plot_eti_distribution(df, output_dir)
+    plot_eti_by_income(df, output_dir)
+    plot_response_patterns(df, output_dir)
+
+
+# File: ./collect_results.py
+# collect_results.py
+import os
+from pathlib import Path
+import pandas as pd
+
+
+def read_file(path):
+    """Read file content, handling different file types."""
+    if path.suffix == ".csv":
+        return pd.read_csv(path).head().to_string()
+    else:
+        with open(path, "r") as f:
+            return f.read()
+
+
+def collect_results(
+    results_dir: str = "results/combined_analysis_20241105_150542",
+):
+    """Collect and format results for sharing."""
+    results_path = Path(results_dir)
+
+    output = ["<documents>", "\n# Key Files and Results for ETI Analysis\n"]
+
+    # File structure
+    output.append("\n## File Structure")
+    for f in sorted(results_path.glob("*")):
+        output.append(f"- {f.name}")
+
+    # Regression table
+    reg_table = results_path / "regression_table.tex"
+    if reg_table.exists():
+        output.extend(
+            [
+                "\n## Main Regression Table",
+                "<document>",
+                "<source>regression_table.tex</source>",
+                "<document_content>",
+                read_file(reg_table),
+                "</document_content>",
+                "</document>",
+            ]
+        )
+
+    # Summary stats
+    summary_stats = results_path / "summary_stats.csv"
+    if summary_stats.exists():
+        output.extend(
+            [
+                "\n## Summary Statistics",
+                "<document>",
+                "<source>summary_stats.csv</source>",
+                "<document_content>",
+                read_file(summary_stats),
+                "</document_content>",
+                "</document>",
+            ]
+        )
+
+    # Raw data preview
+    raw_data = results_path / "combined_results.csv"
+    if raw_data.exists():
+        output.extend(
+            [
+                "\n## Raw Data Preview",
+                "<document>",
+                "<source>combined_results.csv</source>",
+                "<document_content>",
+                read_file(raw_data),
+                "</document_content>",
+                "</document>",
+            ]
+        )
+
+    # List generated plots
+    output.append("\n## Generated Plots")
+    for plot in results_path.glob("*.png"):
+        output.append(f"- {plot.name}")
+
+    output.append("</documents>")
+
+    # Write to file
+    with open("results_for_paper.txt", "w") as f:
+        f.write("\n".join(output))
+
+    print("Results collected in results_for_paper.txt")
+
+
+if __name__ == "__main__":
+    collect_results()
+
+
+# File: ./tax_utils.py
+def calculate_eti(initial_rate, new_rate, initial_income, new_income):
+    percent_change_income = (new_income - initial_income) / initial_income
+    percent_change_net_of_tax_rate = ((1 - new_rate) - (1 - initial_rate)) / (
+        1 - initial_rate
+    )
+    return percent_change_income / percent_change_net_of_tax_rate
+
+
+def parse_income_response(response):
+    try:
+        return float(response.strip().replace("$", "").replace(",", ""))
+    except ValueError:
+        return None
+
+
+# File: ./data_utils.py
+import pandas as pd
+import numpy as np
+
+
+def clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean and prepare data for analysis."""
+    reg_df = df.copy()
+
+    # Convert columns to numeric and clean
+    reg_df["income_100k"] = (
+        pd.to_numeric(reg_df["broad_income"], errors="coerce") / 100000
+    )
+    reg_df["mtr_change"] = pd.to_numeric(
+        reg_df["new_rate"], errors="coerce"
+    ) - pd.to_numeric(reg_df["prior_rate"], errors="coerce")
+    reg_df["implied_eti"] = pd.to_numeric(
+        reg_df["implied_eti"], errors="coerce"
+    )
+    reg_df["abs_mtr_change"] = np.abs(reg_df.mtr_change)
+
+    # Drop any invalid values
+    reg_df = reg_df.dropna(subset=["income_100k", "mtr_change", "implied_eti"])
+
+    return reg_df
+
+
+def calculate_summary_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculate summary statistics by model."""
+    summary_stats = (
+        df.groupby("model")
+        .agg(
+            {
+                "implied_eti": [
+                    "count",
+                    "mean",
+                    "median",
+                    "std",
+                    lambda x: (x == 0).mean(),
+                    lambda x: np.percentile(x, 25),
+                    lambda x: np.percentile(x, 75),
+                ]
+            }
+        )
+        .round(4)
+    )
+    summary_stats.columns = [
+        "N",
+        "Mean ETI",
+        "Median ETI",
+        "Std ETI",
+        "Share No Response",
+        "P25 ETI",
+        "P75 ETI",
+    ]
+    return summary_stats
+
+
+def print_diagnostics(
+    original_df: pd.DataFrame,
+    clean_df: pd.DataFrame,
+    summary_stats: pd.DataFrame,
+):
+    """Print data diagnostics."""
+    print("\nData diagnostics:")
+    print(f"Original rows: {len(original_df)}")
+    print(f"Non-null ETIs: {original_df['implied_eti'].notna().sum()}")
+    print(f"Clean rows after conversion: {len(clean_df)}")
+
+    print("\nSummary by model:")
+    print(summary_stats)
+
+
+# File: ./cli.py
+import click
+import json
+from datetime import datetime
+from pathlib import Path
+from config import Config
+from simulation_engine import SimulationParams, TaxSimulation
+from gpt_utils import GPTClient
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(
+            obj,
+            (
+                np.int_,
+                np.intc,
+                np.intp,
+                np.int8,
+                np.int16,
+                np.int32,
+                np.int64,
+                np.uint8,
+                np.uint16,
+                np.uint32,
+                np.uint64,
+            ),
+        ):
+            return int(obj)
+        elif isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
+            return float(obj)
+        return super().default(obj)
+
+
+@click.group()
+def cli():
+    """Tax Policy Simulation CLI"""
+    pass
+
+
+def calculate_summary_statistics(df):
+    """Calculate summary statistics from simulation results"""
+    # Calculate stats by income level
+    stats_by_income = {}
+    for income in sorted(df["broad_income"].unique()):
+        income_df = df[df["broad_income"] == income]
+        stats_by_income[str(int(income))] = {
+            "eti_mean": float(income_df["implied_eti"].mean()),
+            "eti_std": float(income_df["implied_eti"].std()),
+            "response_count": int(income_df["implied_eti"].count()),
+            "income_mean": float(income_df["parsed_income"].mean()),
+            "income_std": float(income_df["parsed_income"].std()),
+        }
+
+    return {
+        "overall_avg_eti": float(df["implied_eti"].mean()),
+        "overall_std_eti": float(df["implied_eti"].std()),
+        "by_income": stats_by_income,
+        "sample_size": int(len(df)),
+        "valid_responses": int(df["parsed_income"].notna().sum()),
+    }
+
+
+def generate_visualizations(df, output_dir):
+    """Generate and save visualizations"""
+    plt.style.use("default")
+
+    # ETI by Income Level
+    plt.figure(figsize=(12, 6))
+    sns.boxplot(data=df, x="broad_income", y="implied_eti")
+    plt.xticks(rotation=45)
+    plt.title("ETI Distribution by Income Level")
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_income.png")
+    plt.close()
+
+    # ETI by Tax Rate
+    plt.figure(figsize=(12, 6))
+    sns.scatterplot(data=df, x="new_rate", y="implied_eti", hue="broad_income")
+    plt.title("ETI vs Tax Rate by Income Level")
+    plt.tight_layout()
+    plt.savefig(output_dir / "eti_by_tax_rate.png")
+    plt.close()
+
+
+@cli.command()
+@click.option(
+    "--min-income",
+    default=Config.DEFAULT_PARAMS["min_income"],
+    help="Minimum income to simulate",
+)
+@click.option(
+    "--max-income",
+    default=Config.DEFAULT_PARAMS["max_income"],
+    help="Maximum income to simulate",
+)
+@click.option(
+    "--income-step",
+    default=Config.DEFAULT_PARAMS["income_step"],
+    help="Income step size",
+)
+@click.option(
+    "--model", default=Config.DEFAULT_PARAMS["model"], help="GPT model to use"
+)
+@click.option(
+    "--output",
+    default=None,
+    help="Output directory name (defaults to timestamp)",
+)
+@click.option(
+    "--rate-step",
+    default=Config.DEFAULT_PARAMS["rate_step"],
+    help="Tax rate step size",
+)
+@click.option(
+    "--responses-per-rate",
+    default=Config.DEFAULT_PARAMS["responses_per_rate"],
+    help="Number of responses per tax rate",
+)
+def run_simulation(
+    min_income,
+    max_income,
+    income_step,
+    model,
+    output,
+    rate_step,
+    responses_per_rate,
+):
+    """Run bulk tax policy simulation"""
+
+    if not Config.OPENAI_API_KEY:
+        raise click.ClickException(
+            "OPENAI_API_KEY not found in environment variables"
+        )
+
+    # Create output directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = Config.RESULTS_DIR / (output or f"simulation_{timestamp}")
+    output_dir.mkdir(exist_ok=True)
+
+    # Initialize client and parameters
+    client = GPTClient(api_key=Config.OPENAI_API_KEY, model=model)
+    params = SimulationParams(
+        min_rate=Config.DEFAULT_PARAMS["min_rate"],
+        max_rate=Config.DEFAULT_PARAMS["max_rate"],
+        step_size=rate_step,
+        responses_per_rate=responses_per_rate,
+        taxable_income_ratio=Config.DEFAULT_PARAMS["taxable_income_ratio"],
+    )
+
+    # Run simulation
+    click.echo(f"\nRunning simulation with model {model}...")
+    click.echo(
+        f"Income range: ${min_income:,} to ${max_income:,} in steps of ${income_step:,}"
+    )
+    click.echo(
+        f"Tax rate range: {params.min_rate:.1%} to {params.max_rate:.1%} in steps of {params.step_size:.1%}"
+    )
+    click.echo(f"Responses per rate: {params.responses_per_rate}\n")
+
+    simulation = TaxSimulation(client, params)
+    results_df = simulation.run_bulk_simulation(
+        min_income,
+        max_income,
+        income_step,
+        Config.DEFAULT_PARAMS["prior_rate"],
+    )
+
+    if results_df.empty:
+        click.echo("No results generated. Please check for errors above.")
+        return
+
+    # Save raw results
+    results_path = output_dir / "raw_responses.csv"
+    results_df.to_csv(results_path, index=False)
+    click.echo(f"\nRaw responses saved to {results_path}")
+
+    # Calculate and save summary statistics
+    summary = calculate_summary_statistics(results_df)
+    summary_path = output_dir / "summary_statistics.json"
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2, cls=NumpyEncoder)
+    click.echo(f"Summary statistics saved to {summary_path}")
+
+    # Generate visualizations
+    generate_visualizations(results_df, output_dir)
+    click.echo(f"Visualizations saved to {output_dir}")
+
+    # Run regression analysis
+    from analysis import analyze_eti_heterogeneity
+
+    reg_results = analyze_eti_heterogeneity(results_df, output_dir)
+    click.echo(f"Regression table saved to {output_dir}/regression_table.tex")
+
+    # Print summary
+    click.echo("\nSummary Statistics:")
+    click.echo(f"Average ETI: {summary['overall_avg_eti']:.3f}")
+    click.echo(f"Standard Deviation: {summary['overall_std_eti']:.3f}")
+    click.echo(f"Total responses attempted: {summary['sample_size']}")
+    click.echo(f"Valid responses: {summary['valid_responses']}")
+
+
+if __name__ == "__main__":
+    cli()
+
+
+# File: ./regression_utils.py
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.tools import add_constant
+
+
+def run_model_regressions(model_df: pd.DataFrame, model_name: str) -> dict:
+    """Run three regressions for a single model."""
+    print(f"\nRunning regression for {model_name}")
+    print(f"N = {len(model_df)}")
+
+    try:
+        # Regression 1: ETI ~ Income
+        X1 = add_constant(model_df[["income_100k"]])
+        reg1 = sm.OLS(model_df["implied_eti"], X1).fit(cov_type="HC1")
+        print(reg1.summary())
+
+        # Regression 2: ETI ~ Income + Absolute MTR change
+        X2 = add_constant(model_df[["income_100k", "abs_mtr_change"]])
+        reg2 = sm.OLS(model_df["implied_eti"], X2).fit(cov_type="HC1")
+        print(reg2.summary())
+
+        # Regression 3: Add interaction
+        model_df["income_abs_mtr_interact"] = (
+            model_df["income_100k"] * model_df["abs_mtr_change"]
+        )
+        X3 = add_constant(
+            model_df[
+                ["income_100k", "abs_mtr_change", "income_abs_mtr_interact"]
+            ]
+        )
+        reg3 = sm.OLS(model_df["implied_eti"], X3).fit(cov_type="HC1")
+        print(reg3.summary())
+
+        print(
+            f"R-squared values: {reg1.rsquared:.3f}, {reg2.rsquared:.3f}, {reg3.rsquared:.3f}"
+        )
+
+        return {"Model": model_name, "regs": [reg1, reg2, reg3]}
+
+    except Exception as e:
+        print(f"Error in regression for {model_name}: {str(e)}")
+        return None
+
+
+# File: ./simulation_engine.py
+import pandas as pd
+import numpy as np
+from typing import List, Dict
+from dataclasses import dataclass
+from datetime import datetime
+from tqdm import tqdm
+
+
+@dataclass
+class SimulationParams:
+    min_rate: float
+    max_rate: float
+    step_size: float
+    responses_per_rate: int
+    taxable_income_ratio: float = 0.75
+
+
+class TaxSimulation:
+    def __init__(self, gpt_client, params: SimulationParams):
+        self.gpt_client = gpt_client
+        self.params = params
+
+    def generate_income_ranges(
+        self, min_income: float, max_income: float, step: float
+    ) -> List[float]:
+        return np.arange(min_income, max_income + step, step)
+
+    def create_prompt(
+        self,
+        broad_income: float,
+        taxable_income: float,
+        prior_rate: float,
+        new_rate: float,
+    ) -> str:
+        return f"""
+        You are a taxpayer with the following tax profile:
+        - Your broad income last year was ${broad_income:,.2f}
+        - Your taxable income last year (after deductions) was ${taxable_income:,.2f}
+        - Your marginal tax rate last year was {prior_rate:.2%}
+        
+        This year, if you had the same broad income as last year, your marginal tax rate will change to {new_rate:.2%}. Given this change, estimate your taxable income for this year.
+        Consider how this change in tax rate might affect your behavior, such as your work hours, investment decisions, or tax planning strategies.
+        
+        Provide your response as a single number representing your estimated taxable income for this year, rounded to the nearest dollar. Do not include any explanations or additional text.
+        """
+
+    def run_single_simulation(
+        self, broad_income: float, prior_rate: float, new_rate: float
+    ) -> List[Dict]:
+        taxable_income = broad_income * self.params.taxable_income_ratio
+        prompt = self.create_prompt(
+            broad_income, taxable_income, prior_rate, new_rate
+        )
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            responses = self.gpt_client.get_gpt4_response(
+                prompt, n=self.params.responses_per_rate
+            )
+            results = []
+
+            for i, response in enumerate(responses):
+                parsed_income = self.gpt_client.parse_income_response(response)
+                if parsed_income is not None:
+                    eti = None
+                    if prior_rate != new_rate:  # Avoid division by zero
+                        eti = self.gpt_client.calculate_eti(
+                            prior_rate, new_rate, taxable_income, parsed_income
+                        )
+
+                    results.append(
+                        {
+                            "timestamp": timestamp,
+                            "broad_income": broad_income,
+                            "prior_taxable_income": taxable_income,
+                            "prior_rate": prior_rate,
+                            "new_rate": new_rate,
+                            "response_number": i + 1,
+                            "raw_response": response,
+                            "parsed_income": parsed_income,
+                            "implied_eti": eti,
+                        }
+                    )
+
+            return results
+        except Exception as e:
+            print(
+                f"Error in simulation for income {broad_income}, rate {new_rate}: {str(e)}"
+            )
+            return []
+
+    def run_bulk_simulation(
+        self,
+        min_income: float,
+        max_income: float,
+        income_step: float,
+        prior_rate: float,
+    ) -> pd.DataFrame:
+        all_results = []
+        income_ranges = self.generate_income_ranges(
+            min_income, max_income, income_step
+        )
+        tax_rates = np.arange(
+            self.params.min_rate,
+            self.params.max_rate + self.params.step_size,
+            self.params.step_size,
+        )
+
+        total_simulations = len(income_ranges) * len(tax_rates)
+        with tqdm(total=total_simulations, desc="Running simulations") as pbar:
+            for broad_income in income_ranges:
+                for rate in tax_rates:
+                    results = self.run_single_simulation(
+                        broad_income, prior_rate, rate
+                    )
+                    all_results.extend(results)
+                    pbar.update(1)
+
+        return pd.DataFrame(all_results)
+
+
+# File: ./app.py
+import streamlit as st
+import matplotlib.pyplot as plt
+from simulation_engine import SimulationParams, TaxSimulation
+
+
+def run_streamlit_app(gpt_client):
+    st.title("Tax Policy Simulation and ETI Calculator")
+
+    # Input parameters
+    params = SimulationParams(
+        min_rate=st.number_input(
+            "Minimum Tax Rate", min_value=0.0, max_value=1.0, value=0.15
+        ),
+        max_rate=st.number_input(
+            "Maximum Tax Rate", min_value=0.0, max_value=1.0, value=0.35
+        ),
+        step_size=st.number_input(
+            "Step Size", min_value=0.01, max_value=0.1, value=0.02
+        ),
+        responses_per_rate=st.number_input(
+            "Responses per Rate", min_value=1, value=10
+        ),
+    )
+
+    broad_income = st.number_input(
+        "Prior Year's Broad Income", min_value=0.0, value=100000.0
+    )
+    prior_rate = st.number_input(
+        "Prior Year's Marginal Rate", min_value=0.0, max_value=1.0, value=0.25
+    )
+
+    if st.button("Run Simulation"):
+        simulation = TaxSimulation(gpt_client, params)
+        df = simulation.run_bulk_simulation(
+            broad_income, broad_income, 1, prior_rate
+        )
+
+        # Display results and create visualizations
+        st.write(df)
+        create_visualization(df)
+
+
+def create_visualization(df):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+
+    # Plot 1: Expected Taxable Income vs Tax Rate
+    df.plot(x="New Tax Rate", y="Average Expected Taxable Income", ax=ax1)
+    ax1.set_title("Expected Taxable Income vs Tax Rate")
+    ax1.set_xlabel("Marginal Tax Rate")
+    ax1.set_ylabel("Expected Taxable Income ($)")
+
+    # Plot 2: Implied ETI vs Tax Rate
+    df.plot(x="New Tax Rate", y="Implied ETI", ax=ax2)
+    ax2.set_title("Implied ETI vs Tax Rate")
+    ax2.set_xlabel("Marginal Tax Rate")
+    ax2.set_ylabel("Implied ETI")
+
+    plt.tight_layout()
+    st.pyplot(fig)
+
+
+# File: ./gpt_utils.py
+from openai import OpenAI
+from typing import List
+
+
+class GPTClient:
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+        self.client = OpenAI(api_key=api_key)
+        self.model = model
+
+    def get_gpt4_response(self, prompt: str, n: int = 1) -> List[str]:
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                n=n,
+            )
+            return [choice.message.content for choice in response.choices]
+        except Exception as e:
+            print(f"Error getting GPT response: {str(e)}")
+            return []
+
+    @staticmethod
+    def calculate_eti(
+        initial_rate: float,
+        new_rate: float,
+        initial_income: float,
+        new_income: float,
+    ) -> float:
+        try:
+            percent_change_income = (
+                new_income - initial_income
+            ) / initial_income
+            percent_change_net_of_tax_rate = (
+                (1 - new_rate) - (1 - initial_rate)
+            ) / (1 - initial_rate)
+            if percent_change_net_of_tax_rate == 0:
+                return None
+            return percent_change_income / percent_change_net_of_tax_rate
+        except ZeroDivisionError:
+            return None
+        except Exception as e:
+            print(f"Error calculating ETI: {str(e)}")
+            return None
+
+    @staticmethod
+    def parse_income_response(response: str) -> float:
+        """Parse the income response, handling various formats."""
+        try:
+            # Remove common currency symbols and formatting
+            cleaned = response.strip().replace("$", "").replace(",", "")
+            # Convert to float and handle negative numbers
+            return abs(float(cleaned))
+        except (ValueError, TypeError):
+            return None
+
+
+# File: ./stitch_files.py
+import os
+
+
+def stitch_py_files(root_dir, output_file):
+    """
+    Collect all Python files in a directory and its subdirectories,
+    and combine their content into a single output text file,
+    skipping files in .venv directories.
+
+    Args:
+        root_dir (str): Path to the root directory to search for .py files.
+        output_file (str): Path to the output file.
+    """
+    with open(output_file, "w", encoding="utf-8") as outfile:
+        for root, _, files in os.walk(root_dir):
+            # Skip directories containing '.venv'
+            if ".venv" in root:
+                continue
+            for file in files:
+                if file.endswith(".py"):
+                    file_path = os.path.join(root, file)
+                    try:
+                        with open(
+                            file_path, "r", encoding="utf-8", errors="ignore"
+                        ) as infile:
+                            outfile.write(
+                                f"# File: {file_path}\n"
+                            )  # Add header for each file
+                            outfile.write(
+                                infile.read() + "\n\n"
+                            )  # Append file content
+                    except Exception as e:
+                        print(f"Error reading file {file_path}: {e}")
+    print(f"All .py files have been stitched into {output_file}")
+
+
+# Specify the root directory and output file
+root_directory = "."
+output_file = "stitched_files.txt"
+
+stitch_py_files(root_directory, output_file)
+
+
+# File: ./tests/test_simulation.py
+import pytest
+from simulation_engine import SimulationParams, TaxSimulation
+from gpt_utils import GPTClient
+
+
+class MockGPTClient:
+    def get_gpt4_response(self, prompt, n=1):
+        return ["75000"] * n
+
+    def parse_income_response(self, response):
+        return float(response)
+
+    def calculate_eti(self, *args):
+        return 0.4
+
+
+def test_simulation_params():
+    params = SimulationParams(
+        min_rate=0.15, max_rate=0.35, step_size=0.02, responses_per_rate=10
+    )
+    assert params.min_rate == 0.15
+    assert params.max_rate == 0.35
+
+
+def test_simulation_run():
+    client = MockGPTClient()
+    params = SimulationParams(
+        min_rate=0.15, max_rate=0.35, step_size=0.02, responses_per_rate=1
+    )
+
+    simulation = TaxSimulation(client, params)
+    result = simulation.run_single_simulation(100000, 0.25, 0.30)
+
+    assert result is not None
+    assert result["Broad Income"] == 100000
+    assert result["Prior Taxable Income"] == 75000
+    assert result["Implied ETI"] == 0.4
+
+

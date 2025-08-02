@@ -1,40 +1,66 @@
-.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o
+.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint
 
+# Install dependencies using uv
 install:
-	pip install -r requirements.txt
+	@command -v uv >/dev/null 2>&1 || (echo "Installing uv..." && curl -LsSf https://astral.sh/uv/install.sh | sh)
+	@echo "Creating virtual environment..."
+	@uv venv --python 3.13
+	@echo "Installing dependencies..."
+	@uv pip sync requirements.txt
+	@echo ""
+	@echo "✅ Installation complete! Activate the environment with:"
+	@echo "    source .venv/bin/activate"
 
-run-simulation:
-	python cli.py run-simulation
+# Legacy simulation commands - removed since we don't have cli.py anymore
+# These can be reimplemented using direct Python scripts if needed
 
-test-simulation:
-	python cli.py run-simulation \
-		--min-income 50000 \
-		--max-income 200000 \
-		--income-step 50000 \
-		--rate-step 0.05 \
-		--responses-per-rate 3 \
-		--model gpt-4o-mini
+run-simple-regression:
+	uv run python -m llm_eti.simple_regression
 
-run-simulation-high-income:
-	python cli.py run-simulation \
-		--min-income 200000 \
-		--max-income 1000000 \
-		--income-step 50000
+# JupyterBook commands
+book:
+	cd book && make book
 
-run-simulation-4o:
-	python cli.py run-simulation --model gpt-4o
+book-serve:
+	cd book && make serve
 
-.PHONY: run-4o analyze-both
+book-pdf:
+	cd book && make pdf
 
-run-4o:
-	python cli.py run-simulation \
-		--model gpt-4o \
-		--output simulation_4o
-
-analyze-both:
-	python combine_analyze.py \
-		results/simulation_20241105_143622 \
-		results/simulation_4o
+book-test:
+	cd book && make test-data && make figures && make tables && make book
 
 clean:
 	rm -rf results/*
+	cd book && make clean-all
+
+# Format code
+format:
+	uv run black .
+	uv run ruff check --fix .
+
+# Lint code
+lint:
+	uv run black --check .
+	uv run ruff check .
+	uv run mypy . --ignore-missing-imports
+
+# Help
+help:
+	@echo "Simulation commands:"
+	@echo "  install               - Install dependencies with uv"
+	@echo "  run-simulation        - Run standard simulation"
+	@echo "  test-simulation       - Run quick test simulation"
+	@echo "  run-simple-regression - Run enhanced regression analysis"
+	@echo ""
+	@echo "JupyterBook commands:"
+	@echo "  book                  - Build the JupyterBook"
+	@echo "  book-serve            - Serve book locally"
+	@echo "  book-pdf              - Generate PDF"
+	@echo "  book-test             - Run test pipeline with book"
+	@echo ""
+	@echo "Development commands:"
+	@echo "  format                - Format code with black and ruff"
+	@echo "  lint                  - Run linters"
+	@echo ""
+	@echo "  clean                 - Clean all generated files"

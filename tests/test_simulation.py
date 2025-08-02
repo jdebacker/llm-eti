@@ -1,6 +1,4 @@
-import pytest
 from llm_eti.simulation_engine import SimulationParams, TaxSimulation
-from llm_eti.gpt_utils import GPTClient
 
 
 class MockGPTClient:

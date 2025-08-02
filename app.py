@@ -1,5 +1,6 @@
-import streamlit as st
 import matplotlib.pyplot as plt
+import streamlit as st
+
 from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 

@@ -1,13 +1,13 @@
 # %%
 # imports
-from openai import OpenAI
-import pandas as pd
-import numpy as np
-import re
-import pickle
-import time
 import os
+import pickle
+import re
+import time
 
+import numpy as np
+import pandas as pd
+from openai import OpenAI
 
 """
 This Python script accesses the OpenAI API to get responses from

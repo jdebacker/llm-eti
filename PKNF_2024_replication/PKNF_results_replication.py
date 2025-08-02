@@ -1,12 +1,12 @@
 # %%
 # imports
-import pandas as pd
-import numpy as np
-import statsmodels.formula.api as smf
 import os
 import pickle
-import plotly.express as px
 
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import statsmodels.formula.api as smf
 
 # get directory of current file
 CUR_DIR = os.path.dirname(os.path.realpath(__file__))

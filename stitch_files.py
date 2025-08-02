@@ -26,9 +26,7 @@ def stitch_py_files(root_dir, output_file):
                             outfile.write(
                                 f"# File: {file_path}\n"
                             )  # Add header for each file
-                            outfile.write(
-                                infile.read() + "\n\n"
-                            )  # Append file content
+                            outfile.write(infile.read() + "\n\n")  # Append file content
                     except Exception as e:
                         print(f"Error reading file {file_path}: {e}")
     print(f"All .py files have been stitched into {output_file}")

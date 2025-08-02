@@ -1,14 +1,14 @@
-import click
 import json
 from datetime import datetime
-from pathlib import Path
-from llm_eti.config import Config
-from llm_eti.simulation_engine import SimulationParams, TaxSimulation
-from llm_eti.gpt_utils import GPTClient
-import pandas as pd
-import numpy as np
+
+import click
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+
+from llm_eti.config import Config
+from llm_eti.gpt_utils import GPTClient
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -190,7 +190,7 @@ def run_simulation(
     # Run regression analysis
     from analysis import analyze_eti_heterogeneity
 
-    reg_results = analyze_eti_heterogeneity(results_df, output_dir)
+    analyze_eti_heterogeneity(results_df, output_dir)
     click.echo(f"Regression table saved to {output_dir}/regression_table.tex")
 
     # Print summary

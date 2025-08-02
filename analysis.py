@@ -1,9 +1,11 @@
 from pathlib import Path
+
 import pandas as pd
-from llm_eti.data_utils import clean_data, calculate_summary_stats, print_diagnostics
+
+from llm_eti.data_utils import calculate_summary_stats, clean_data, print_diagnostics
+from llm_eti.plotting import create_all_plots
 from llm_eti.regression_utils import run_model_regressions
 from llm_eti.table_utils import generate_latex_table
-from llm_eti.plotting import create_all_plots
 
 
 def analyze_eti_heterogeneity(df: pd.DataFrame, output_dir: Path) -> dict:

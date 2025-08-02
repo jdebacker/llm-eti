@@ -1,12 +1,14 @@
-import pandas as pd
-import click
-from pathlib import Path
-from analysis import analyze_eti_heterogeneity
 import json
-import matplotlib.pyplot as plt
-import seaborn as sns
 from datetime import datetime
+from pathlib import Path
+
+import click
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+
+from analysis import analyze_eti_heterogeneity
 
 
 def load_simulation_results(path: Path) -> pd.DataFrame:
@@ -105,7 +107,7 @@ def combine_and_analyze(mini_path, full_path, output):
     mini_df = load_simulation_results(Path(mini_path))
     full_df = load_simulation_results(Path(full_path))
 
-    print(f"\nLoaded data:")
+    print("\nLoaded data:")
     print(f"GPT-4o-mini: {len(mini_df):,} observations")
     print(f"GPT-4o: {len(full_df):,} observations")
 

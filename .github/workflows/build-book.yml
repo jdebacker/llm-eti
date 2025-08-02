@@ -17,6 +17,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    env:
+      EXPECTED_PARROT_API_KEY: ${{ secrets.EXPECTED_PARROT_API_KEY }}
+    
     steps:
     - uses: actions/checkout@v4
     

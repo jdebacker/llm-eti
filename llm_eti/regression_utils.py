@@ -1,9 +1,13 @@
+from typing import Any, Dict, Optional
+
 import pandas as pd
 import statsmodels.api as sm
 from statsmodels.tools import add_constant
 
 
-def run_model_regressions(model_df: pd.DataFrame, model_name: str) -> dict:
+def run_model_regressions(
+    model_df: pd.DataFrame, model_name: str
+) -> Optional[Dict[str, Any]]:
     """Run three regressions for a single model."""
     print(f"\nRunning regression for {model_name}")
     print(f"N = {len(model_df)}")

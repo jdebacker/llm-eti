@@ -24,7 +24,7 @@ class TaxSimulation:
     def generate_income_ranges(
         self, min_income: float, max_income: float, step: float
     ) -> List[float]:
-        return np.arange(min_income, max_income + step, step)
+        return list(np.arange(min_income, max_income + step, step))
 
     def create_prompt(
         self,
@@ -107,7 +107,9 @@ class TaxSimulation:
         with tqdm(total=total_simulations, desc="Running simulations") as pbar:
             for broad_income in income_ranges:
                 for rate in tax_rates:
-                    results = self.run_single_simulation(broad_income, prior_rate, rate)
+                    results = self.run_single_simulation(
+                        broad_income, prior_rate, float(rate)
+                    )
                     all_results.extend(results)
                     pbar.update(1)
 

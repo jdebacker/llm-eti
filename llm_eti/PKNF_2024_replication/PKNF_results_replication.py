@@ -2,6 +2,7 @@
 # imports
 import os
 import pickle
+from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
@@ -156,7 +157,7 @@ PKNF_Table6_Col1 = [
 df["treated"] = (df["treatment"] > 1).astype(int)
 df["post_treat"] = df["Post"] * df["treated"]
 df["Treatment"] = df["treatment"].map(treat_dict)
-reg_results_dict = {}
+reg_results_dict: Dict[str, Any] = {}
 for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     # Keep the treatment and control
     df_reg = df[(df["Treatment"] == treat) | (df["treatment"] == 1)]
@@ -165,14 +166,14 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     # Estimate the model
     results = model.fit()
     reg_results_dict[treat] = []  # initialize list to store results
-    reg_results_dict[treat].append(f"{results.params["Post"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["Post"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["treated"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["treated"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["post_treat"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["post_treat"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["Intercept"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["Intercept"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params['Post']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['Post']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['treated']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['treated']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['post_treat']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['post_treat']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['Intercept']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['Intercept']:.3f})")
     reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
 # put into dataframe
 reg_results = pd.DataFrame(reg_results_dict)
@@ -236,14 +237,14 @@ for treat in ["Prog,Flat25", "Prog,Flat50", "Flat25,Prog", "Flat50,Prog"]:
     # Estimate the model
     results = model.fit()
     reg_results_dict[treat] = []  # initialize list to store results
-    reg_results_dict[treat].append(f"{results.params["Post"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["Post"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["treated"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["treated"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["post_treat"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["post_treat"]:.3f})")
-    reg_results_dict[treat].append(f"{results.params["Intercept"]:.3f}")
-    reg_results_dict[treat].append(f"({results.bse["Intercept"]:.3f})")
+    reg_results_dict[treat].append(f"{results.params['Post']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['Post']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['treated']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['treated']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['post_treat']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['post_treat']:.3f})")
+    reg_results_dict[treat].append(f"{results.params['Intercept']:.3f}")
+    reg_results_dict[treat].append(f"({results.bse['Intercept']:.3f})")
     reg_results_dict[treat].extend([f"{results.nobs:.0f}", f"{results.rsquared:.3f}"])
 
 # put into dataframe

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from openai import OpenAI
 
@@ -15,7 +15,11 @@ class GPTClient:
                 messages=[{"role": "user", "content": prompt}],
                 n=n,
             )
-            return [choice.message.content for choice in response.choices]
+            return [
+                choice.message.content
+                for choice in response.choices
+                if choice.message.content is not None
+            ]
         except Exception as e:
             print(f"Error getting GPT response: {str(e)}")
             return []
@@ -26,7 +30,7 @@ class GPTClient:
         new_rate: float,
         initial_income: float,
         new_income: float,
-    ) -> float:
+    ) -> Optional[float]:
         try:
             percent_change_income = (new_income - initial_income) / initial_income
             percent_change_net_of_tax_rate = ((1 - new_rate) - (1 - initial_rate)) / (
@@ -42,7 +46,7 @@ class GPTClient:
             return None
 
     @staticmethod
-    def parse_income_response(response: str) -> float:
+    def parse_income_response(response: str) -> Optional[float]:
         """Parse the income response, handling various formats."""
         try:
             # Remove common currency symbols and formatting

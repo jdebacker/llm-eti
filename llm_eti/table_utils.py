@@ -1,3 +1,6 @@
+import pandas as pd
+
+
 def format_coef(coef, se, pval):
     """Format coefficient with stars and standard error."""
     stars = ""
@@ -10,7 +13,7 @@ def format_coef(coef, se, pval):
     return f"${coef:.3f}{stars}$ \\\\ ({se:.3f})"
 
 
-def generate_latex_table(results_dict: dict, summary_stats: dict) -> str:
+def generate_latex_table(results_dict: list, summary_stats: pd.DataFrame) -> str:
     """Generate LaTeX table comparing both models."""
     models = ["gpt-4o", "gpt-4o-mini"]
 

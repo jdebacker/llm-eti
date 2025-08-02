@@ -23,8 +23,8 @@ def collect_results(
 
     # File structure
     output.append("\n## File Structure")
-    for f in sorted(results_path.glob("*")):
-        output.append(f"- {f.name}")
+    for file_path in sorted(results_path.glob("*")):
+        output.append(f"- {file_path.name}")
 
     # Regression table
     reg_table = results_path / "regression_table.tex"

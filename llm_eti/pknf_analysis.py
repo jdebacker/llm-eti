@@ -20,13 +20,13 @@ def calculate_bunching_eti(df: pd.DataFrame, notch_location: int = 400) -> float
     Returns:
         Lower bound estimate of ETI
     """
-    # Filter for relevant tax schedules
-    flat_income = df[df["tax_schedule"] == "flat25"]["income"]
-    prog_income = df[df["tax_schedule"] == "progressive"]["income"]
+    # Filter for relevant tax schedules (not used in this simplified calculation)
+    # flat_income = df[df["tax_schedule"] == "flat25"]["income"]
+    # prog_income = df[df["tax_schedule"] == "progressive"]["income"]
 
     # Calculate bunching mass
     # Count observations at or just below the notch (380-400 ECU)
-    bunching_window = (380, 400)
+    # bunching_window = (380, 400)
 
     # Calculate bunching mass (not used in this simplified calculation)
     # flat_mass = (

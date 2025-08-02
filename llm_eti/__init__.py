@@ -8,13 +8,14 @@ __version__ = "0.1.0"
 
 # Import key classes for convenience
 from .config import Config
-from .gpt_utils import GPTClient
-from .simulation_engine import SimulationParams, TaxSimulation
+from .edsl_client import EDSLClient
+from .simulation_engine_edsl import SimulationParams, TaxSimulation, LabExperimentSimulation
 
 __all__ = [
     "__version__",
     "Config",
-    "GPTClient",
+    "EDSLClient",
     "TaxSimulation",
+    "LabExperimentSimulation",
     "SimulationParams",
 ]

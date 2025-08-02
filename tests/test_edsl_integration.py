@@ -1,9 +1,9 @@
 """Test EDSL integration for LLM ETI surveys."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-import pandas as pd
 import os
+from unittest.mock import MagicMock, patch
+
+import pandas as pd
 
 
 class TestEDSLIntegration:
@@ -89,8 +89,8 @@ class TestEDSLIntegration:
 
             # Run same survey twice
             survey = client.create_tax_survey(100000, 75000, 0.25, 0.30)
-            result1 = client.run_survey(survey)
-            result2 = client.run_survey(survey)
+            client.run_survey(survey)
+            client.run_survey(survey)
 
             # Should only call API once due to caching
             assert mock_run.call_count == 1

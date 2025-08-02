@@ -1,11 +1,12 @@
 """EDSL client for running LLM surveys."""
 
 import os
-from typing import List, Dict, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from dotenv import load_dotenv
 
 try:
-    from edsl import Question, Survey, Agent, Model, Jobs
+    from edsl import Agent, Jobs, Model, Question, Survey
     from edsl.questions import QuestionNumerical
 except ImportError:
     # For testing without EDSL installed

@@ -74,9 +74,13 @@ class TaxSimulation:
             return formatted_results
 
         except Exception as e:
+            import traceback
             print(
-                f"Error in simulation for income {broad_income}, rate {new_rate}: {str(e)}"
+                f"\nError in simulation for income {broad_income}, rate {new_rate}:"
             )
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            traceback.print_exc()
             return []
 
     def run_bulk_simulation(

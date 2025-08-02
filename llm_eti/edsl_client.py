@@ -63,6 +63,9 @@ class EDSLClient:
         Returns:
             EDSL Survey object
         """
+        # Debug print
+        # print(f"DEBUG: broad_income={broad_income}, type={type(broad_income)}")
+        
         # Convert rates to percentages for display
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
@@ -77,11 +80,15 @@ This year, if you had the same broad income, your marginal tax rate will change 
 Given this change, estimate your taxable income for this year. 
 Please provide only a numeric value in dollars."""
 
+        # Ensure numeric types are Python native (not numpy)
+        min_val = 0
+        max_val = float(broad_income * 2)  # Convert to native Python float
+        
         question = QuestionNumerical(
             question_name="taxable_income",
             question_text=prompt,
-            min_value=0,
-            max_value=broad_income * 2,  # Allow for some flexibility
+            min_value=min_val,
+            max_value=max_val,  # Allow for some flexibility
         )
 
         return Survey([question])

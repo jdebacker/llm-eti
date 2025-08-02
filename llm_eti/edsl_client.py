@@ -180,12 +180,19 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
                 results = self.run_survey(survey)
 
                 # Extract results
-                df = results.select(f"answer.{result_key}", "model").to_pandas()
+                df = results.select(f"answer.{result_key}").to_pandas()
+
+                # Add model info if available
+                try:
+                    model_df = results.select("model").to_pandas()
+                    df["model"] = model_df["model"]
+                except Exception:
+                    df["model"] = self.model  # Use default model if not in results
 
                 for _, row in df.iterrows():
                     result_dict = scenario.copy()
                     result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
-                    result_dict["model"] = row["model"]
+                    result_dict["model"] = row.get("model", self.model)
 
                     # Calculate ETI for tax surveys
                     if survey_type == "tax":

@@ -179,36 +179,39 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
                 survey = self.create_lab_experiment_survey(**scenario)
                 result_key = "labor_supply"
 
-            # Run survey n times
-            for _ in range(n):
-                results = self.run_survey(survey)
-
-                # Extract results
-                df = results.select(f"answer.{result_key}").to_pandas()
-
-                # Add model info if available
-                try:
-                    model_df = results.select("model").to_pandas()
-                    df["model"] = model_df["model"]
-                except Exception:
-                    df["model"] = self.model  # Use default model if not in results
-
-                for _, row in df.iterrows():
-                    result_dict = scenario.copy()
-                    result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
-                    result_dict["model"] = row.get("model", self.model)
-
-                    # Calculate ETI for tax surveys
-                    if survey_type == "tax":
-                        eti = self.calculate_eti(
-                            scenario["mtr_last"],
-                            scenario["mtr_this"],
-                            scenario["taxable_income"],
-                            row[f"answer.{result_key}"],
-                        )
-                        result_dict["implied_eti"] = eti
-
-                    all_results.append(result_dict)
+            # Create multiple agents for batch processing
+            agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
+            
+            # Handle model creation with service names
+            if self.model.startswith("gemini-"):
+                model = Model(self.model, service_name="google")
+            else:
+                model = Model(self.model)
+            
+            # Run all agents at once
+            job = Jobs(survey=survey, agents=agents, models=[model])
+            results = job.run(cache=self.use_cache)
+            
+            # Extract results to DataFrame
+            df = results.to_pandas()
+            
+            # Process each response
+            for idx, row in df.iterrows():
+                result_dict = scenario.copy()
+                result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
+                result_dict["model"] = row.get("model.model", self.model)
+                
+                # Calculate ETI for tax surveys
+                if survey_type == "tax":
+                    eti = self.calculate_eti(
+                        scenario["mtr_last"],
+                        scenario["mtr_this"],
+                        scenario["taxable_income"],
+                        row[f"answer.{result_key}"],
+                    )
+                    result_dict["implied_eti"] = eti
+                
+                all_results.append(result_dict)
 
         return all_results
 

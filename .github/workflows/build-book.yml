@@ -94,6 +94,11 @@ jobs:
         make figures
         make tables
     
+    - name: Check for missing images
+      run: |
+        cd book
+        uv run python scripts/check_missing_images.py
+    
     - name: Build JupyterBook
       run: |
         cd book

@@ -35,16 +35,16 @@ install:
 data:
 	@echo "Running LLM simulations with EDSL..."
 	@mkdir -p $(DATA_DIR)
-	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation_edsl.py
-	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation_edsl.py
+	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation.py
+	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation.py
 
 # Run test simulations with gpt-4o-mini only (for CI)
 .PHONY: test-data
 test-data:
 	@echo "Running test simulations with gpt-4o-mini using EDSL..."
 	@mkdir -p $(DATA_DIR)
-	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation_edsl.py --test --model gpt-4o-mini
-	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation_edsl.py --test --model gpt-4o-mini
+	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation.py --test --model gpt-4o-mini
+	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation.py --test --model gpt-4o-mini
 
 # Generate figures from data
 .PHONY: figures

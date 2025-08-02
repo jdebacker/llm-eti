@@ -9,7 +9,7 @@ __version__ = "0.1.0"
 # Import key classes for convenience
 from .config import Config
 from .edsl_client import EDSLClient
-from .simulation_engine_edsl import (
+from .simulation_engine import (
     LabExperimentSimulation,
     SimulationParams,
     TaxSimulation,

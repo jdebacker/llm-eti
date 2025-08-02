@@ -12,7 +12,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from llm_eti.edsl_client import EDSLClient
-from llm_eti.simulation_engine_edsl import SimulationParams, TaxSimulation
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 
 def main():

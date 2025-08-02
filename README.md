@@ -4,7 +4,9 @@ This repository contains code and analysis for the paper "What can LLMs tell us 
 
 ## Overview
 
-We investigate how Large Language Models (LLMs) perceive and simulate behavioral responses to tax policy changes, specifically measuring the Elasticity of Taxable Income (ETI). The study includes:
+We investigate how Large Language Models (LLMs) perceive and simulate behavioral responses to tax policy changes, specifically measuring the Elasticity of Taxable Income (ETI). 
+
+The study includes:
 
 1. **Lab Experiment Replication**: Replicating Pfeil et al. (2024) using LLMs instead of human subjects
 2. **Observational Study Replication**: Simulating Gruber & Saez (2002) methodology with LLM responses

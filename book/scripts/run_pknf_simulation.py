@@ -59,7 +59,7 @@ def main():
     output_dir = Path(__file__).parent.parent / "data"
     output_dir.mkdir(exist_ok=True)
 
-    filename = f"pknf_results_{args.model}_edsl"
+    filename = f"pknf_results_{args.model}"
     if args.test:
         filename += "_test"
 

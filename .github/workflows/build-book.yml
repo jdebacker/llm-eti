@@ -52,7 +52,7 @@ jobs:
         cd book
         mkdir -p data
         # Create placeholder CSV files for EDSL format
-        cat > data/pknf_results_gpt-4o-mini_edsl_test.csv << 'EOF'
+        cat > data/pknf_results_gpt-4o-mini_test.csv << 'EOF'
         treatment,subject_id,round_num,tax_schedule,labor_endowment,labor_supply,income,post_reform,model
         Prog,Prog,0,1,progressive,25,20,400,False,gpt-4o-mini
         Prog,Prog,0,2,progressive,28,22,440,False,gpt-4o-mini
@@ -71,7 +71,7 @@ jobs:
         EOF
         
         # Create data for EDSL format
-        cat > data/gruber_saez_results_gpt-4o-mini_edsl_test.csv << 'EOF'
+        cat > data/gruber_saez_results_gpt-4o-mini_test.csv << 'EOF'
         timestamp,broad_income,prior_taxable_income,prior_rate,new_rate,response_number,raw_response,parsed_income,implied_eti,model
         2024-01-01 00:00:00,50000,37500,0.25,0.30,1,Taxable income: 35000,35000,0.4,gpt-4o-mini
         2024-01-01 00:00:00,55000,41250,0.25,0.30,1,Taxable income: 38500,38500,0.4,gpt-4o-mini

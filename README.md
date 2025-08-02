@@ -15,20 +15,20 @@ The study includes:
 
 ### Prerequisites
 
-- Python 3.13+
-- OpenAI API key
+- Python 3.12 (required for dependency compatibility)
+- Expected Parrot API key (for EDSL)
 
 ### Installation
 
 ```bash
-# Install uv and create environment
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies (uses Python 3.12 automatically)
 make install
 
-# Activate the virtual environment
-source .venv/bin/activate
-
-# Set your OpenAI API key
-export OPENAI_API_KEY=your-key-here
+# Set your Expected Parrot API key
+export EXPECTED_PARROT_API_KEY=your-key-here
 ```
 
 ### For Collaborators

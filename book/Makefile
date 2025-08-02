@@ -3,6 +3,8 @@
 # Variables
 PYTHON := python3
 UV := uv
+# Use Python 3.12 for compatibility with dependencies
+export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
 BOOK_DIR := .
 BUILD_DIR := _build
 SCRIPTS_DIR := scripts

@@ -1,15 +1,21 @@
 .PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint
 
+# Use Python 3.12 for compatibility
+export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+
 # Install dependencies using uv
 install:
 	@command -v uv >/dev/null 2>&1 || (echo "Installing uv..." && curl -LsSf https://astral.sh/uv/install.sh | sh)
-	@echo "Creating virtual environment..."
-	@uv venv --python 3.13
+	@echo "Creating virtual environment with Python 3.12..."
+	@uv venv --python 3.12
 	@echo "Installing dependencies..."
-	@uv pip sync requirements.txt
+	@uv sync
 	@echo ""
-	@echo "✅ Installation complete! Activate the environment with:"
-	@echo "    source .venv/bin/activate"
+	@echo "✅ Installation complete!"
+	@echo ""
+	@echo "To get started:"
+	@echo "1. Set your API key: export EXPECTED_PARROT_API_KEY=your-key-here"
+	@echo "2. Build and serve the book: cd book && make serve"
 
 # Legacy simulation commands - removed since we don't have cli.py anymore
 # These can be reimplemented using direct Python scripts if needed

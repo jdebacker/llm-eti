@@ -11,8 +11,8 @@ import numpy as np
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from table_utils import create_summary_table
-from regression_utils import run_regressions
+from llm_eti.table_utils import create_summary_table
+from llm_eti.regression_utils import run_regressions
 
 
 def generate_summary_stats_table(df_4o, df_mini, output_path):

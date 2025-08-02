@@ -1,6 +1,6 @@
 import streamlit as st
 import matplotlib.pyplot as plt
-from simulation_engine import SimulationParams, TaxSimulation
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 
 def run_streamlit_app(gpt_client):

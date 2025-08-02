@@ -1,6 +1,6 @@
 # File: simple_regression.py
 
-from data_utils import clean_data
+from llm_eti.data_utils import clean_data
 import statsmodels.api as sm
 from statsmodels.tools import add_constant
 from statsmodels.regression.linear_model import OLS

@@ -17,17 +17,41 @@ The study includes:
 
 - Python 3.13+
 - OpenAI API key
-- [uv](https://github.com/astral-sh/uv) (auto-installed if missing)
 
 ### Installation
 
 ```bash
-# Install dependencies
+# Install uv and create environment
 make install
+
+# Activate the virtual environment
+source .venv/bin/activate
 
 # Set your OpenAI API key
 export OPENAI_API_KEY=your-key-here
 ```
+
+### For Collaborators
+
+To ensure everyone uses the same environment:
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/MaxGhenis/llm-eti.git
+   cd llm-eti
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   make install
+   source .venv/bin/activate
+   ```
+
+3. **Verify installation**:
+   ```bash
+   python --version  # Should show 3.13.x
+   uv --version      # Should show uv version
+   ```
 
 ### Run Test Analysis
 

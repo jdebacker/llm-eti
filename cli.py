@@ -2,9 +2,9 @@ import click
 import json
 from datetime import datetime
 from pathlib import Path
-from config import Config
-from simulation_engine import SimulationParams, TaxSimulation
-from gpt_utils import GPTClient
+from llm_eti.config import Config
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
+from llm_eti.gpt_utils import GPTClient
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

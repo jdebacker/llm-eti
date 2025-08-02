@@ -3,7 +3,13 @@
 # Install dependencies using uv
 install:
 	@command -v uv >/dev/null 2>&1 || (echo "Installing uv..." && curl -LsSf https://astral.sh/uv/install.sh | sh)
-	uv sync
+	@echo "Creating virtual environment..."
+	@uv venv --python 3.13
+	@echo "Installing dependencies..."
+	@uv pip sync requirements.txt
+	@echo ""
+	@echo "✅ Installation complete! Activate the environment with:"
+	@echo "    source .venv/bin/activate"
 
 # Legacy simulation commands
 run-simulation:

@@ -12,7 +12,7 @@ import seaborn as sns
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from plotting import plot_eti_by_income, create_eti_distribution_plot
+from llm_eti.plotting import plot_eti_by_income, create_eti_distribution_plot
 
 
 def main():

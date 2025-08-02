@@ -67,21 +67,34 @@ def main():
     if 'implied_eti' in gs_4o.columns:
         generate_summary_stats_table(gs_4o, gs_mini, tables_dir / 'summary_stats.tex')
     
-    # 2. Copy existing regression table if available
-    existing_reg_table = Path(__file__).parent.parent.parent / 'results' / 'simulation_4o' / 'regression_table.tex'
-    if existing_reg_table.exists():
-        import shutil
-        shutil.copy(existing_reg_table, tables_dir / 'regression_results.tex')
+    # 2. Try to generate regression table using simple_regression.py
+    simple_reg_script = Path(__file__).parent.parent.parent / 'simple_regression.py'
+    if simple_reg_script.exists() and (data_dir.parent.parent / 'results' / 'simulation_4o' / 'raw_responses.csv').exists():
+        # Run the regression analysis
+        import subprocess
+        subprocess.run([sys.executable, str(simple_reg_script)], cwd=str(simple_reg_script.parent))
+        
+        # Copy the generated table
+        existing_reg_table = Path(__file__).parent.parent.parent / 'results' / 'simulation_4o' / 'regression_table.tex'
+        if existing_reg_table.exists():
+            import shutil
+            shutil.copy(existing_reg_table, tables_dir / 'regression_results.tex')
     else:
-        # Create placeholder
-        with open(tables_dir / 'regression_results.tex', 'w') as f:
-            f.write("% Placeholder for regression results table\n")
-            f.write("\\begin{table}[h]\n")
-            f.write("\\caption{Regression Results}\n")
-            f.write("\\begin{center}\n")
-            f.write("\\textit{Run full simulations to generate this table}\n")
-            f.write("\\end{center}\n")
-            f.write("\\end{table}\n")
+        # Copy existing regression table if available
+        existing_reg_table = Path(__file__).parent.parent.parent / 'results' / 'simulation_4o' / 'regression_table.tex'
+        if existing_reg_table.exists():
+            import shutil
+            shutil.copy(existing_reg_table, tables_dir / 'regression_results.tex')
+        else:
+            # Create placeholder
+            with open(tables_dir / 'regression_results.tex', 'w') as f:
+                f.write("% Placeholder for regression results table\n")
+                f.write("\\begin{table}[h]\n")
+                f.write("\\caption{Regression Results}\n")
+                f.write("\\begin{center}\n")
+                f.write("\\textit{Run full simulations to generate this table}\n")
+                f.write("\\end{center}\n")
+                f.write("\\end{table}\n")
     
     print(f"Tables saved to {tables_dir}/")
 

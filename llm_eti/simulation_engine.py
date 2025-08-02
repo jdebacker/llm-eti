@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -74,9 +74,12 @@ class TaxSimulation:
             return formatted_results
 
         except Exception as e:
-            print(
-                f"Error in simulation for income {broad_income}, rate {new_rate}: {str(e)}"
-            )
+            import traceback
+
+            print(f"\nError in simulation for income {broad_income}, rate {new_rate}:")
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
+            traceback.print_exc()
             return []
 
     def run_bulk_simulation(
@@ -110,45 +113,77 @@ class TaxSimulation:
 
 # Lab experiment simulation for PKNF replication
 class LabExperimentSimulation:
-    """PKNF lab experiment simulation using EDSL."""
+    """PKNF lab experiment simulation using EDSL.
+
+    This class replicates the experimental framework of Pfeil, Kasper, Necker & Feld (2024),
+    which measures labor supply responses to changes in tax schedules. The experiment consists of:
+
+    - 16 rounds of decision-making
+    - Tax reform after round 8 (either adding or removing a notch)
+    - Randomized labor endowments (14-30 units per round)
+    - Wage of 20 ECU per unit of labor
+
+    References:
+        Pfeil, K., Kasper, M., Necker, S., & Feld, L. P. (2024).
+        Tax System Design, Tax Reform, and Labor Supply. CESifo Working Paper No. 11350.
+    """
 
     def __init__(self, edsl_client: EDSLClient):
         self.client = edsl_client
+        # Import here to avoid circular imports
+        from .config import Config
+
+        self.config = Config.PKNF_CONFIG
 
     def run_experiment(
-        self, treatments: List[str], rounds: int = 16, subjects_per_treatment: int = 100
+        self,
+        treatments: List[str],
+        rounds: Optional[int] = None,
+        subjects_per_treatment: int = 100,
     ) -> pd.DataFrame:
-        """Run the full lab experiment simulation."""
+        """Run the full lab experiment simulation.
+
+        Args:
+            treatments: List of treatment labels to run (e.g., ["Prog,Prog", "Prog,Flat25"])
+            rounds: Number of rounds (default: 16 from config)
+            subjects_per_treatment: Number of subjects per treatment group
+
+        Returns:
+            DataFrame with experiment results
+        """
+        from .pknf_types import Treatment
+
+        if rounds is None:
+            rounds = int(self.config["rounds"])
+
         all_results = []
 
-        # Treatment mapping
-        treatment_map = {
-            "Prog,Prog": ["progressive", "progressive"],
-            "Prog,Flat25": ["progressive", "flat25"],
-            "Prog,Flat50": ["progressive", "flat50"],
-            "Flat25,Prog": ["flat25", "progressive"],
-            "Flat50,Prog": ["flat50", "progressive"],
-        }
-
-        for treatment_name, (first_schedule, second_schedule) in treatment_map.items():
-            if treatment_name not in treatments:
+        for treatment_label in treatments:
+            try:
+                treatment = Treatment.from_label(treatment_label)
+            except ValueError:
+                print(f"Warning: Unknown treatment '{treatment_label}', skipping")
                 continue
 
             for subject_id in range(subjects_per_treatment):
                 # Random labor endowments for each round
-                labor_endowments = np.random.randint(14, 31, size=rounds)
+                labor_endowments = np.random.randint(
+                    int(self.config["labor_endowment_min"]),
+                    int(self.config["labor_endowment_max"]) + 1,
+                    size=rounds,
+                )
 
-                for round_num in range(rounds):
-                    # Determine tax schedule based on round
-                    if round_num < 8:
-                        schedule = first_schedule
-                    else:
-                        schedule = second_schedule
+                for round_idx in range(rounds):
+                    round_num = round_idx + 1  # 1-based round number
+
+                    # Get tax schedule for this round
+                    schedule = treatment.get_schedule_for_round(round_num)
 
                     scenario = {
-                        "round_num": round_num + 1,
-                        "tax_schedule": schedule,
-                        "labor_endowment": int(labor_endowments[round_num]),
+                        "round_num": round_num,
+                        "tax_schedule": schedule.value,
+                        "labor_endowment": int(labor_endowments[round_idx]),
+                        "wage_per_unit": self.config["wage_per_unit"],
                     }
 
                     # Run survey
@@ -158,17 +193,18 @@ class LabExperimentSimulation:
 
                     if results:
                         result = results[0]
+                        labor_supply = result.get("labor_supply_this", 0)
+
                         all_results.append(
                             {
-                                "treatment": treatment_name,
+                                "treatment": treatment.label,
                                 "subject_id": subject_id,
-                                "round_num": round_num + 1,
-                                "tax_schedule": schedule,
-                                "labor_endowment": labor_endowments[round_num],
-                                "labor_supply": result["labor_supply_this"],
-                                "income": result["labor_supply_this"]
-                                * 20,  # 20 ECU per unit
-                                "post_reform": round_num >= 8,
+                                "round": round_num,  # Changed from round_num to round
+                                "tax_schedule": schedule.value,
+                                "labor_endowment": labor_endowments[round_idx],
+                                "labor_supply": labor_supply,
+                                "income": labor_supply * self.config["wage_per_unit"],
+                                "post_reform": round_num > self.config["reform_round"],
                                 "model": result.get("model", self.client.model),
                             }
                         )

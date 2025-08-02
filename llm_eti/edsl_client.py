@@ -63,25 +63,33 @@ class EDSLClient:
         Returns:
             EDSL Survey object
         """
+        # Debug print
+        # print(f"DEBUG: broad_income={broad_income}, type={type(broad_income)}")
+
         # Convert rates to percentages for display
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
 
-        prompt = f"""You are a taxpayer with the following tax profile:
-- Your broad income last year was ${broad_income:,.0f}
-- Your taxable income last year was ${taxable_income:,.0f}
-- Your marginal tax rate last year was {mtr_last_pct}%
+        prompt = f"""Last year:
+- Total income: ${broad_income:,.0f}
+- Taxable income: ${taxable_income:,.0f}
+- Tax rate: {mtr_last_pct}%
 
-This year, if you had the same broad income, your marginal tax rate will change to {mtr_this_pct}%.
+This year:
+- Total income: ${broad_income:,.0f} (same)
+- Tax rate: {mtr_this_pct}%
 
-Given this change, estimate your taxable income for this year. 
-Please provide only a numeric value in dollars."""
+What will your taxable income be this year? (Enter a number between 0 and {broad_income:,.0f})"""
+
+        # Ensure numeric types are Python native (not numpy)
+        min_val = 0
+        max_val = float(broad_income * 2)  # Convert to native Python float
 
         question = QuestionNumerical(
             question_name="taxable_income",
             question_text=prompt,
-            min_value=0,
-            max_value=broad_income * 2,  # Allow for some flexibility
+            min_value=min_val,
+            max_value=max_val,  # Allow for some flexibility
         )
 
         return Survey([question])
@@ -104,22 +112,37 @@ Please provide only a numeric value in dollars."""
         Returns:
             EDSL Survey object
         """
-        # Define tax schedule details
-        if tax_schedule == "flat25":
-            tax_desc = "a flat tax rate of 25%"
-        elif tax_schedule == "flat50":
-            tax_desc = "a flat tax rate of 50%"
-        else:  # progressive
-            tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
+        # Try to use enum for better descriptions
+        try:
+            from llm_eti.pknf_types import TaxSchedule
 
-        prompt = f"""You are participating in an economic experiment (Round {round_num}).
+            schedule_enum = TaxSchedule(tax_schedule)
+            tax_desc = schedule_enum.description
+        except (ImportError, ValueError):
+            # Fallback to original logic
+            if tax_schedule == "flat25":
+                tax_desc = "a flat tax rate of 25%"
+            elif tax_schedule == "flat50":
+                tax_desc = "a flat tax rate of 50%"
+            else:  # progressive
+                tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
 
-You have a labor endowment of {labor_endowment} units.
-Each unit of labor you supply earns you {wage_per_unit} experimental currency units (ECU).
+        # Create base prompt with simpler language
+        prompt = f"""You can work up to {labor_endowment} hours (Round {round_num}).
+Each hour pays ${wage_per_unit}.
 
-The tax system is: {tax_desc}
+Tax system: {tax_desc}"""
 
-How many units of labor will you supply? (Enter a number between 0 and {labor_endowment})"""
+        # Add note only for progressive tax
+        if tax_schedule == "progressive":
+            prompt += """
+
+Example: Working 20 hours earns $400, taxed at 25% = $100 tax, keeping $300.
+Working 21 hours earns $420, but tax = $110, keeping only $310."""
+
+        prompt += f"""
+
+How many hours will you work? (0-{labor_endowment})"""
 
         question = QuestionNumerical(
             question_name="labor_supply",
@@ -140,7 +163,11 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
         Returns:
             Survey results
         """
-        model = Model(self.model)
+        # Handle model creation with service names for specific providers
+        if self.model.startswith("gemini-"):
+            model = Model(self.model, service_name="google")
+        else:
+            model = Model(self.model)
 
         if agent:
             job = Jobs(survey=survey, agents=[agent], models=[model])
@@ -175,36 +202,39 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
                 survey = self.create_lab_experiment_survey(**scenario)
                 result_key = "labor_supply"
 
-            # Run survey n times
-            for _ in range(n):
-                results = self.run_survey(survey)
+            # Create multiple agents for batch processing
+            agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
 
-                # Extract results
-                df = results.select(f"answer.{result_key}").to_pandas()
+            # Handle model creation with service names
+            if self.model.startswith("gemini-"):
+                model = Model(self.model, service_name="google")
+            else:
+                model = Model(self.model)
 
-                # Add model info if available
-                try:
-                    model_df = results.select("model").to_pandas()
-                    df["model"] = model_df["model"]
-                except Exception:
-                    df["model"] = self.model  # Use default model if not in results
+            # Run all agents at once
+            job = Jobs(survey=survey, agents=agents, models=[model])
+            results = job.run(cache=self.use_cache)
 
-                for _, row in df.iterrows():
-                    result_dict = scenario.copy()
-                    result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
-                    result_dict["model"] = row.get("model", self.model)
+            # Extract results to DataFrame
+            df = results.to_pandas()
 
-                    # Calculate ETI for tax surveys
-                    if survey_type == "tax":
-                        eti = self.calculate_eti(
-                            scenario["mtr_last"],
-                            scenario["mtr_this"],
-                            scenario["taxable_income"],
-                            row[f"answer.{result_key}"],
-                        )
-                        result_dict["implied_eti"] = eti
+            # Process each response
+            for idx, row in df.iterrows():
+                result_dict = scenario.copy()
+                result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
+                result_dict["model"] = row.get("model.model", self.model)
 
-                    all_results.append(result_dict)
+                # Calculate ETI for tax surveys
+                if survey_type == "tax":
+                    eti = self.calculate_eti(
+                        scenario["mtr_last"],
+                        scenario["mtr_this"],
+                        scenario["taxable_income"],
+                        row[f"answer.{result_key}"],
+                    )
+                    result_dict["implied_eti"] = eti
+
+                all_results.append(result_dict)
 
         return all_results
 

@@ -186,7 +186,7 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
                 try:
                     model_df = results.select("model").to_pandas()
                     df["model"] = model_df["model"]
-                except:
+                except Exception:
                     df["model"] = self.model  # Use default model if not in results
 
                 for _, row in df.iterrows():

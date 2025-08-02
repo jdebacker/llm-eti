@@ -2,7 +2,6 @@
 """Command-line tool to analyze EDSL cache usage."""
 
 import argparse
-import json
 from pathlib import Path
 
 from llm_eti.cache_utils import CacheExplorer
@@ -50,7 +49,7 @@ def main():
     # Cost savings
     savings = explorer.estimate_cost_savings()
     if "error" not in savings:
-        print(f"\nCost Savings:")
+        print("\nCost Savings:")
         print(f"  - Cached responses: {savings['cached_responses']}")
         print(f"  - Estimated tokens saved: {savings['estimated_tokens_saved']:,}")
         print(f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}")

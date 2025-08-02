@@ -57,11 +57,11 @@ def main():
     client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
     experiment = LabExperimentSimulation(client)
 
-    print(f"Running PKNF simulation with:")
+    print("Running PKNF simulation with:")
     print(f"  - Model: {args.model}")
     print(f"  - Subjects per treatment: {num_subjects}")
     print(f"  - Total treatments: {len(treatments)}")
-    print(f"  - Total rounds: 16")
+    print("  - Total rounds: 16")
     print(f"  - Cache enabled: {client.use_cache}")
 
     # Run experiment

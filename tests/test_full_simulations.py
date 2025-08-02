@@ -64,10 +64,10 @@ class TestFullSimulations:
         simulation = TaxSimulation(client, params)
 
         # Calculate expected scenarios
-        n_incomes = 16  # 50k to 200k in 10k steps
-        n_rates = 11  # 0.15 to 0.35 in 0.02 steps
-        n_responses = 100
-        expected_scenarios = n_incomes * n_rates * n_responses
+        # n_incomes = 16  # 50k to 200k in 10k steps
+        # n_rates = 11  # 0.15 to 0.35 in 0.02 steps
+        # n_responses = 100
+        # expected_scenarios = n_incomes * n_rates * n_responses
 
         # Run simulation for one income level to verify
         results = simulation.run_single_simulation(

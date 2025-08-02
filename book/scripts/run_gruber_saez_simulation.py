@@ -61,7 +61,7 @@ def main():
         step_size=0.02,
     )
 
-    print(f"Running simulation with:")
+    print("Running simulation with:")
     print(f"  - Model: {args.model}")
     print(f"  - Responses per rate: {responses_per_rate}")
     print(

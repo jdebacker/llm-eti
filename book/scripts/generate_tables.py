@@ -71,11 +71,9 @@ def main():
     if "implied_eti" in gs_4o.columns:
         generate_summary_stats_table(gs_4o, gs_mini, tables_dir / "summary_stats.tex")
 
-    # 2. Try to generate regression table using simple_regression.py
-    simple_reg_script = Path(__file__).parent.parent.parent / "simple_regression.py"
+    # 2. Try to generate regression table using simple_regression module
     if (
-        simple_reg_script.exists()
-        and (
+        (
             data_dir.parent.parent / "results" / "simulation_4o" / "raw_responses.csv"
         ).exists()
     ):
@@ -83,7 +81,8 @@ def main():
         import subprocess
 
         subprocess.run(
-            [sys.executable, str(simple_reg_script)], cwd=str(simple_reg_script.parent)
+            [sys.executable, "-m", "llm_eti.simple_regression"], 
+            cwd=str(Path(__file__).parent.parent.parent)
         )
 
         # Copy the generated table

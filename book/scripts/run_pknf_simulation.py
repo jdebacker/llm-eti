@@ -11,7 +11,7 @@ from pathlib import Path
 # Add parent directory to path to import from main project
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from PKNF_2024_replication.GPT_PKNF_replication import TaxBehaviorReplication
+from llm_eti.PKNF_2024_replication.GPT_PKNF_replication import TaxBehaviorReplication
 
 
 def main():

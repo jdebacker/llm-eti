@@ -11,42 +11,11 @@ install:
 	@echo "✅ Installation complete! Activate the environment with:"
 	@echo "    source .venv/bin/activate"
 
-# Legacy simulation commands
-run-simulation:
-	uv run python cli.py run-simulation
-
-test-simulation:
-	uv run python cli.py run-simulation \
-		--min-income 50000 \
-		--max-income 200000 \
-		--income-step 50000 \
-		--rate-step 0.05 \
-		--responses-per-rate 3 \
-		--model gpt-4o-mini
-
-run-simulation-high-income:
-	uv run python cli.py run-simulation \
-		--min-income 200000 \
-		--max-income 1000000 \
-		--income-step 50000
-
-run-simulation-4o:
-	uv run python cli.py run-simulation --model gpt-4o
-
-.PHONY: run-4o analyze-both
-
-run-4o:
-	uv run python cli.py run-simulation \
-		--model gpt-4o \
-		--output simulation_4o
-
-analyze-both:
-	uv run python combine_analyze.py \
-		results/simulation_20241105_143622 \
-		results/simulation_4o
+# Legacy simulation commands - removed since we don't have cli.py anymore
+# These can be reimplemented using direct Python scripts if needed
 
 run-simple-regression:
-	uv run python simple_regression.py
+	uv run python -m llm_eti.simple_regression
 
 # JupyterBook commands
 book:

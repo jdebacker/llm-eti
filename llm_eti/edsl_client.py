@@ -181,7 +181,7 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
 
                 # Extract results
                 df = results.select(f"answer.{result_key}").to_pandas()
-                
+
                 # Add model info if available
                 try:
                     model_df = results.select("model").to_pandas()

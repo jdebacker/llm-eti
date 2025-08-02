@@ -41,7 +41,7 @@ def main():
 
     # Initialize client and parameters
     client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
-    
+
     # Set parameters based on mode
     if args.test:
         responses_per_rate = 10
@@ -53,7 +53,7 @@ def main():
         # Default mode - medium size
         responses_per_rate = 50
         min_income, max_income, income_step = 50000, 150000, 20000
-    
+
     params = SimulationParams(
         responses_per_rate=responses_per_rate,
         min_rate=0.15,
@@ -64,7 +64,9 @@ def main():
     print(f"Running simulation with:")
     print(f"  - Model: {args.model}")
     print(f"  - Responses per rate: {responses_per_rate}")
-    print(f"  - Income range: ${min_income:,} to ${max_income:,} (step ${income_step:,})")
+    print(
+        f"  - Income range: ${min_income:,} to ${max_income:,} (step ${income_step:,})"
+    )
     print(f"  - Cache enabled: {client.use_cache}")
 
     # Run simulation
@@ -88,22 +90,24 @@ def main():
     print(f"Results saved to {output_dir / f'{filename}.csv'}")
     print(f"Total responses: {len(results_df)}")
     print(f"Cache usage enabled: {client.use_cache}")
-    
+
     # Analyze cache if requested
     if args.cache_analysis:
         from llm_eti.cache_utils import CacheExplorer
-        
+
         print("\nCache Analysis:")
         explorer = CacheExplorer()
         stats = explorer.get_cache_stats()
-        
+
         if "error" not in stats:
             print(f"  - Total cache entries: {stats['total_entries']}")
             print(f"  - Models in cache: {list(stats['models'].keys())}")
-            
+
             savings = explorer.estimate_cost_savings()
             if "error" not in savings:
-                print(f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}")
+                print(
+                    f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}"
+                )
 
 
 if __name__ == "__main__":

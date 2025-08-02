@@ -56,7 +56,7 @@ def main():
     # Initialize client and experiment
     client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
     experiment = LabExperimentSimulation(client)
-    
+
     print(f"Running PKNF simulation with:")
     print(f"  - Model: {args.model}")
     print(f"  - Subjects per treatment: {num_subjects}")
@@ -80,22 +80,24 @@ def main():
     results_df.to_csv(output_dir / f"{filename}.csv", index=False)
     print(f"Results saved to {output_dir / f'{filename}.csv'}")
     print(f"Total responses: {len(results_df)}")
-    
+
     # Analyze cache if requested
     if args.cache_analysis:
         from llm_eti.cache_utils import CacheExplorer
-        
+
         print("\nCache Analysis:")
         explorer = CacheExplorer()
         stats = explorer.get_cache_stats()
-        
+
         if "error" not in stats:
             print(f"  - Total cache entries: {stats['total_entries']}")
             print(f"  - Models in cache: {list(stats['models'].keys())}")
-            
+
             savings = explorer.estimate_cost_savings()
             if "error" not in savings:
-                print(f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}")
+                print(
+                    f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}"
+                )
 
 
 if __name__ == "__main__":

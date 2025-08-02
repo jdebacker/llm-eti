@@ -22,22 +22,34 @@ def main():
 
     print("Generating figures...")
 
-    # Check if data exists
+    # Check if data exists - try EDSL format first, then legacy
     test_mode = False
-    if not (data_dir / "gruber_saez_results_gpt-4o-mini.csv").exists():
+    edsl_mode = False
+    
+    # Check for EDSL format first
+    if (data_dir / "gruber_saez_results_gpt-4o-mini_edsl.csv").exists():
+        edsl_mode = True
+        print("Using EDSL format data...")
+    elif (data_dir / "gruber_saez_results_gpt-4o-mini_edsl_test.csv").exists():
+        edsl_mode = True
+        test_mode = True
+        print("Using EDSL test data...")
+    elif not (data_dir / "gruber_saez_results_gpt-4o-mini.csv").exists():
         if (data_dir / "gruber_saez_results_gpt-4o-mini_test.csv").exists():
             test_mode = True
-            print("Using test data...")
+            print("Using legacy test data...")
         else:
             print("No data found. Run 'make data' or 'make test-data' first.")
             return
 
     # Load Gruber & Saez results
     suffix = "_test" if test_mode else ""
+    edsl_suffix = "_edsl" if edsl_mode else ""
+    
     try:
-        gs_mini = pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o-mini{suffix}.csv")
+        gs_mini = pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o-mini{edsl_suffix}{suffix}.csv")
         gs_4o = (
-            pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o{suffix}.csv")
+            pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o{edsl_suffix}{suffix}.csv")
             if not test_mode
             else gs_mini.copy()
         )

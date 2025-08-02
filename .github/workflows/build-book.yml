@@ -3,7 +3,7 @@ name: Build JupyterBook
 # Builds and deploys the JupyterBook
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'MaxGhenis/issue5' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:

@@ -43,9 +43,7 @@ def main():
             data_dir / f"gruber_saez_results_gpt-4o-mini{suffix}.csv"
         )
         gs_4o = (
-            pd.read_csv(
-                data_dir / f"gruber_saez_results_gpt-4o{suffix}.csv"
-            )
+            pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o{suffix}.csv")
             if not test_mode
             else gs_mini.copy()
         )

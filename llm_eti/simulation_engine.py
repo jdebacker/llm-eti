@@ -154,7 +154,7 @@ class LabExperimentSimulation:
         from .pknf_types import Treatment
 
         if rounds is None:
-            rounds = self.config["rounds"]
+            rounds = int(self.config["rounds"])
 
         all_results = []
 

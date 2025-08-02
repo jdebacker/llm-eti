@@ -23,7 +23,7 @@ df = pickle.load(
 
 # %%
 # Parse model results to get chose income
-df["income"] = df["model_answer"].str.extract("(\d+)").astype(float)
+df["income"] = df["model_answer"].str.extract(r"(\d+)").astype(float)
 # drop if missing income
 df = df.dropna(subset=["income"])
 

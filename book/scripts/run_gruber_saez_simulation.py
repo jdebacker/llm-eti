@@ -11,9 +11,7 @@ from pathlib import Path
 # Add parent directory to path to import from main project
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from llm_eti.config import SimulationParams
-from llm_eti.gpt_utils import GPTClient
-from llm_eti.simulation_engine import TaxSimulation
+from llm_eti import GPTClient, SimulationParams, TaxSimulation
 
 
 def main():

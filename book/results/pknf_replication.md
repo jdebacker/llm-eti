@@ -21,11 +21,12 @@ Key findings:
 
 ## Responses by Labor Endowment
 
-```{figure} ../figures/lab_supply_by_endowment.png
+```{figure} ../images/LLM_Fig2_Prog,Flat25_matplotlib.png
 :name: fig-lab-supply-max
-:width: 100%
+:width: 80%
+:align: center
 
-Labor supply by potential income under progressive vs. flat tax systems. Left panel shows results from PKNF (2024), right panel shows LLM simulations.
+Labor supply by potential income under progressive vs. flat tax systems for LLM simulations.
 ```
 
 Both humans and LLMs show:
@@ -35,11 +36,11 @@ Both humans and LLMs show:
 
 ## Dynamic Responses Across Rounds
 
-```{figure} ../figures/lab_supply_by_round.png
+```{figure} ../images/LLM_Fig4_matplotlib.png
 :name: fig-lab-supply-round
 :width: 100%
 
-Labor supply responses by treatment group and round. The vertical line indicates the tax reform at round 8.
+Labor supply responses by treatment group and round for LLM simulations. The vertical line indicates the tax reform at round 8.
 ```
 
 Notable differences:
@@ -70,7 +71,7 @@ The treatment effect (Post × Treated) shows:
 
 ## Elasticity of Taxable Income from Bunching
 
-```{figure} ../figures/bunching_density.png
+```{figure} ../images/LLM_bunching_matplotlib.png
 :name: fig-income-density
 :width: 80%
 :align: center

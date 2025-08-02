@@ -22,11 +22,11 @@ Key observations:
 
 ## Distribution of Responses
 
-```{figure} ../figures/eti_distribution.png
-:name: fig-eti-dist
+```{figure} ../images/eti_by_income.png
+:name: fig-eti-income
 :width: 100%
 
-Distribution of implied ETI values by model. GPT-4o shows a large mass at zero (non-responders), while GPT-4o-mini shows more continuous variation.
+Average ETI by income level. The figure shows heterogeneity in tax responsiveness across the income distribution.
 ```
 
 ## ETI Heterogeneity Analysis
@@ -52,23 +52,6 @@ Note: Income measured in $100,000s. Heteroskedasticity-robust standard errors in
 *p<0.1; **p<0.05; ***p<0.01
 ```
 
-## Income Gradient in ETI
-
-```{figure} ../figures/eti_by_income.png
-:name: fig-eti-income
-:width: 100%
-
-Average ETI by income level for both models. Higher-income taxpayers show stronger responses to tax changes in both models.
-```
-
-## Response by Tax Change Direction
-
-```{figure} ../figures/eti_by_tax_direction.png
-:name: fig-eti-direction
-:width: 100%
-
-ETI responses separated by tax increases vs. decreases. Both models show asymmetric responses.
-```
 
 ## Model Interpretation
 

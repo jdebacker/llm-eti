@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Run Gruber & Saez (2002) observational study replication using LLMs.
+Run Gruber & Saez (2002) observational study replication using EDSL.
 """
 
 import argparse
@@ -11,11 +11,14 @@ from pathlib import Path
 # Add parent directory to path to import from main project
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from llm_eti import GPTClient, SimulationParams, TaxSimulation
+from llm_eti.edsl_client import EDSLClient
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Gruber & Saez simulation")
+    parser = argparse.ArgumentParser(
+        description="Run Gruber & Saez simulation with EDSL"
+    )
     parser.add_argument(
         "--test", action="store_true", help="Run in test mode with fewer scenarios"
     )
@@ -23,15 +26,15 @@ def main():
     args = parser.parse_args()
 
     # Check for API key
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("EXPECTED_PARROT_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
+        print("Error: EXPECTED_PARROT_API_KEY environment variable not set")
         sys.exit(1)
 
-    print(f"Running Gruber & Saez simulation with {args.model}...")
+    print(f"Running Gruber & Saez simulation with {args.model} using EDSL...")
 
     # Initialize client and parameters
-    client = GPTClient(api_key=api_key, model=args.model)
+    client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
     params = SimulationParams(
         responses_per_rate=10 if args.test else 100,
         min_rate=0.15,
@@ -63,6 +66,8 @@ def main():
 
     results_df.to_csv(output_dir / f"{filename}.csv", index=False)
     print(f"Results saved to {output_dir / f'{filename}.csv'}")
+    print(f"Total responses: {len(results_df)}")
+    print(f"Cache usage enabled: {client.use_cache}")
 
 
 if __name__ == "__main__":

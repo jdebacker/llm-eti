@@ -33,6 +33,26 @@ def plot_eti_distribution(df: pd.DataFrame, output_dir: Path):
 
 def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
     """Plot ETI by income level for each model."""
+    # Check if we have enough data
+    if (
+        len(df) == 0
+        or "broad_income" not in df.columns
+        or "implied_eti" not in df.columns
+    ):
+        plt.figure(figsize=(8, 6))
+        plt.text(
+            0.5,
+            0.5,
+            "Insufficient data for ETI by income plot",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+        )
+        plt.axis("off")
+        plt.savefig(output_dir / "eti_by_income.png", dpi=150, bbox_inches="tight")
+        plt.close()
+        return
+
     plt.figure(figsize=(12, 6))
 
     # Create income bins
@@ -54,23 +74,28 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
     for model in df["model"].unique():
         model_data = means[means["model"] == model]
 
+        if len(model_data) == 0:
+            continue
+
         # Add confidence intervals
         model_df = df[df["model"] == model]
         ci_data = []
         for bin_val in income_bins[:-1]:
             bin_data = model_df[model_df["income_bin"] == bin_val]["implied_eti"]
-            ci = np.percentile(bin_data, [2.5, 97.5])
-            ci_data.append({"bin": bin_val, "lower": ci[0], "upper": ci[1]})
-        ci_df = pd.DataFrame(ci_data)
+            if len(bin_data) > 0:
+                ci = np.percentile(bin_data, [2.5, 97.5])
+                ci_data.append({"bin": bin_val, "lower": ci[0], "upper": ci[1]})
 
-        # Plot mean and CI
-        ax.plot(
-            model_data["income_bin"],
-            model_data["implied_eti"],
-            marker="o",
-            label=f"{model} (mean)",
-        )
-        ax.fill_between(ci_df["bin"], ci_df["lower"], ci_df["upper"], alpha=0.2)
+        if len(ci_data) > 0:
+            ci_df = pd.DataFrame(ci_data)
+            # Plot mean and CI
+            ax.plot(
+                model_data["income_bin"],
+                model_data["implied_eti"],
+                marker="o",
+                label=f"{model} (mean)",
+            )
+            ax.fill_between(ci_df["bin"], ci_df["lower"], ci_df["upper"], alpha=0.2)
 
     plt.title("ETI by Income Level")
     plt.xlabel("Income")
@@ -89,6 +114,25 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
 
 def plot_response_patterns(df: pd.DataFrame, output_dir: Path):
     """Plot response patterns."""
+    # Check required columns
+    required_cols = ["new_rate", "prior_rate", "implied_eti", "model"]
+    if not all(col in df.columns for col in required_cols) or len(df) == 0:
+        # Create placeholder plots
+        for filename in ["response_rate.png", "eti_by_tax_direction.png"]:
+            plt.figure(figsize=(8, 6))
+            plt.text(
+                0.5,
+                0.5,
+                f"Insufficient data for {filename}",
+                ha="center",
+                va="center",
+                transform=plt.gca().transAxes,
+            )
+            plt.axis("off")
+            plt.savefig(output_dir / filename, dpi=150, bbox_inches="tight")
+            plt.close()
+        return
+
     df["mtr_change"] = df["new_rate"] - df["prior_rate"]
     df["any_response"] = df["implied_eti"] != 0
 

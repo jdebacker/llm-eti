@@ -7,12 +7,12 @@ authors = [
     {name = "Max Ghenis", email = "max@policyengine.org"}
 ]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "openai>=1.0.0",
     "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "matplotlib>=3.7.0",
+    "numpy>=1.26.0,<2.0",  # EDSL compatibility
+    "matplotlib>=3.8.0",  # Compatible with numpy 1.x
     "seaborn>=0.12.0",
     "python-dotenv>=1.0.0",
     "click>=8.1.0",
@@ -27,6 +27,7 @@ dependencies = [
     "sphinx-book-theme>=1.0.0",
     "sphinx-design>=0.4.0",
     "streamlit>=1.28.0",
+    "edsl",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,8 @@ packages = ["llm_eti"]
 
 [tool.ruff]
 line-length = 88
+
+[tool.ruff.lint]
 select = ["E", "F", "I"]
 ignore = ["E501"]
 
@@ -59,6 +62,6 @@ ignore = ["E501"]
 line-length = 88
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true

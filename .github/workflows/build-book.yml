@@ -17,13 +17,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    env:
+      EXPECTED_PARROT_API_KEY: ${{ secrets.EXPECTED_PARROT_API_KEY }}
+    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python 3.13
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: '3.12'
     
     - name: Cache dependencies
       uses: actions/cache@v4
@@ -48,7 +51,17 @@ jobs:
       run: |
         cd book
         mkdir -p data
-        # Create more realistic placeholder CSV files with multiple rows
+        # Create placeholder CSV files for EDSL format
+        cat > data/pknf_results_gpt-4o-mini_test.csv << 'EOF'
+        treatment,subject_id,round_num,tax_schedule,labor_endowment,labor_supply,income,post_reform,model
+        Prog,Prog,0,1,progressive,25,20,400,False,gpt-4o-mini
+        Prog,Prog,0,2,progressive,28,22,440,False,gpt-4o-mini
+        Prog,Prog,0,9,progressive,24,19,380,True,gpt-4o-mini
+        Prog,Flat25,1,1,progressive,26,21,420,False,gpt-4o-mini
+        Prog,Flat25,1,9,flat25,26,24,480,True,gpt-4o-mini
+        EOF
+        
+        # Legacy format for backward compatibility
         cat > data/pknf_results_gpt-4o-mini_test.csv << 'EOF'
         round,rate1,rate2,treatment,max_labor,chosen_labor,personality,raw_response
         1,25,50,prog_flat25,600,400,Standard,Test response
@@ -57,39 +70,26 @@ jobs:
         4,25,50,prog_flat25,300,250,Standard,Test response
         EOF
         
-        # Create data with multiple income levels and data points per bin
+        # Create data for EDSL format
+        cat > data/gruber_saez_results_gpt-4o-mini_test.csv << 'EOF'
+        timestamp,broad_income,prior_taxable_income,prior_rate,new_rate,response_number,raw_response,parsed_income,implied_eti,model
+        2024-01-01 00:00:00,50000,37500,0.25,0.30,1,Taxable income: 35000,35000,0.4,gpt-4o-mini
+        2024-01-01 00:00:00,55000,41250,0.25,0.30,1,Taxable income: 38500,38500,0.4,gpt-4o-mini
+        2024-01-01 00:00:00,60000,45000,0.25,0.30,1,Taxable income: 42000,42000,0.4,gpt-4o-mini
+        2024-01-01 00:00:00,100000,75000,0.30,0.35,1,Taxable income: 69000,69000,0.5,gpt-4o-mini
+        2024-01-01 00:00:00,150000,112500,0.35,0.40,1,Taxable income: 103000,103000,0.6,gpt-4o-mini
+        EOF
+        
+        # Legacy format for backward compatibility
         cat > data/gruber_saez_results_gpt-4o-mini_test.csv << 'EOF'
         broad_income,taxable_income,mtr_last,mtr_this,taxable_income_this,implied_eti,raw_response
         50000,37500,0.25,0.30,35000,0.4,Test response
-        55000,41250,0.25,0.30,38500,0.4,Test response
         60000,45000,0.25,0.30,42000,0.4,Test response
-        65000,48750,0.25,0.30,45500,0.4,Test response
         70000,52500,0.25,0.30,49000,0.4,Test response
-        75000,56250,0.30,0.35,51500,0.5,Test response
         80000,60000,0.30,0.35,55000,0.5,Test response
-        85000,63750,0.30,0.35,58500,0.5,Test response
-        90000,67500,0.30,0.35,62000,0.5,Test response
-        95000,71250,0.30,0.35,65500,0.5,Test response
         100000,75000,0.30,0.35,69000,0.5,Test response
-        105000,78750,0.35,0.40,72000,0.6,Test response
-        110000,82500,0.35,0.40,75000,0.6,Test response
-        115000,86250,0.35,0.40,78500,0.6,Test response
         120000,90000,0.35,0.40,82000,0.6,Test response
-        125000,93750,0.35,0.40,85500,0.6,Test response
-        130000,97500,0.35,0.40,89000,0.6,Test response
-        135000,101250,0.35,0.40,92500,0.6,Test response
-        140000,105000,0.35,0.40,96000,0.6,Test response
-        145000,108750,0.35,0.40,99500,0.6,Test response
         150000,112500,0.35,0.40,103000,0.6,Test response
-        155000,116250,0.35,0.40,106500,0.6,Test response
-        160000,120000,0.35,0.40,110000,0.6,Test response
-        165000,123750,0.35,0.40,113500,0.6,Test response
-        170000,127500,0.35,0.40,117000,0.6,Test response
-        175000,131250,0.35,0.40,120500,0.6,Test response
-        180000,135000,0.35,0.40,124000,0.6,Test response
-        185000,138750,0.35,0.40,127500,0.6,Test response
-        190000,142500,0.35,0.40,131000,0.6,Test response
-        195000,146250,0.35,0.40,134500,0.6,Test response
         200000,150000,0.35,0.40,138000,0.6,Test response
         EOF
     

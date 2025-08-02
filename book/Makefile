@@ -3,6 +3,15 @@
 # Variables
 PYTHON := python3
 UV := uv
+
+# Use Python 3.12 for compatibility
+# On macOS with Homebrew, use the specific path; otherwise let uv find it
+ifeq ($(shell uname -s),Darwin)
+    ifneq ($(wildcard /opt/homebrew/opt/python@3.12/bin/python3.12),)
+        export UV_PYTHON := /opt/homebrew/opt/python@3.12/bin/python3.12
+    endif
+endif
+
 BOOK_DIR := .
 BUILD_DIR := _build
 SCRIPTS_DIR := scripts
@@ -24,7 +33,7 @@ install:
 # Run LLM simulations (expensive - only run when needed)
 .PHONY: data
 data:
-	@echo "Running LLM simulations..."
+	@echo "Running LLM simulations with EDSL..."
 	@mkdir -p $(DATA_DIR)
 	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation.py
 	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation.py
@@ -32,7 +41,7 @@ data:
 # Run test simulations with gpt-4o-mini only (for CI)
 .PHONY: test-data
 test-data:
-	@echo "Running test simulations with gpt-4o-mini..."
+	@echo "Running test simulations with gpt-4o-mini using EDSL..."
 	@mkdir -p $(DATA_DIR)
 	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_pknf_simulation.py --test --model gpt-4o-mini
 	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/run_gruber_saez_simulation.py --test --model gpt-4o-mini
@@ -87,8 +96,8 @@ serve: book
 # Check for required environment variables
 .PHONY: check-env
 check-env:
-	@if [ -z "$$OPENAI_API_KEY" ]; then \
-		echo "Error: OPENAI_API_KEY environment variable is not set"; \
+	@if [ -z "$$EXPECTED_PARROT_API_KEY" ]; then \
+		echo "Error: EXPECTED_PARROT_API_KEY environment variable is not set"; \
 		exit 1; \
 	fi
 

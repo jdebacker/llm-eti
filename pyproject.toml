@@ -1,5 +1,5 @@
 [project]
-name = "llm-eti"
+name = "llm_eti"
 version = "0.1.0"
 description = "What can LLMs tell us about the ETI?"
 authors = [

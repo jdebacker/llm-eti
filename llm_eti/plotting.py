@@ -34,15 +34,25 @@ def plot_eti_distribution(df: pd.DataFrame, output_dir: Path):
 def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
     """Plot ETI by income level for each model."""
     # Check if we have enough data
-    if len(df) == 0 or "broad_income" not in df.columns or "implied_eti" not in df.columns:
+    if (
+        len(df) == 0
+        or "broad_income" not in df.columns
+        or "implied_eti" not in df.columns
+    ):
         plt.figure(figsize=(8, 6))
-        plt.text(0.5, 0.5, "Insufficient data for ETI by income plot", 
-                ha="center", va="center", transform=plt.gca().transAxes)
+        plt.text(
+            0.5,
+            0.5,
+            "Insufficient data for ETI by income plot",
+            ha="center",
+            va="center",
+            transform=plt.gca().transAxes,
+        )
         plt.axis("off")
         plt.savefig(output_dir / "eti_by_income.png", dpi=150, bbox_inches="tight")
         plt.close()
         return
-    
+
     plt.figure(figsize=(12, 6))
 
     # Create income bins
@@ -63,7 +73,7 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
 
     for model in df["model"].unique():
         model_data = means[means["model"] == model]
-        
+
         if len(model_data) == 0:
             continue
 
@@ -75,7 +85,7 @@ def plot_eti_by_income(df: pd.DataFrame, output_dir: Path):
             if len(bin_data) > 0:
                 ci = np.percentile(bin_data, [2.5, 97.5])
                 ci_data.append({"bin": bin_val, "lower": ci[0], "upper": ci[1]})
-        
+
         if len(ci_data) > 0:
             ci_df = pd.DataFrame(ci_data)
             # Plot mean and CI
@@ -110,13 +120,19 @@ def plot_response_patterns(df: pd.DataFrame, output_dir: Path):
         # Create placeholder plots
         for filename in ["response_rate.png", "eti_by_tax_direction.png"]:
             plt.figure(figsize=(8, 6))
-            plt.text(0.5, 0.5, f"Insufficient data for {filename}", 
-                    ha="center", va="center", transform=plt.gca().transAxes)
+            plt.text(
+                0.5,
+                0.5,
+                f"Insufficient data for {filename}",
+                ha="center",
+                va="center",
+                transform=plt.gca().transAxes,
+            )
             plt.axis("off")
             plt.savefig(output_dir / filename, dpi=150, bbox_inches="tight")
             plt.close()
         return
-    
+
     df["mtr_change"] = df["new_rate"] - df["prior_rate"]
     df["any_response"] = df["implied_eti"] != 0
 

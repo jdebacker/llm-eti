@@ -17,9 +17,7 @@ def run_streamlit_app(gpt_client):
         step_size=st.number_input(
             "Step Size", min_value=0.01, max_value=0.1, value=0.02
         ),
-        responses_per_rate=st.number_input(
-            "Responses per Rate", min_value=1, value=10
-        ),
+        responses_per_rate=st.number_input("Responses per Rate", min_value=1, value=10),
     )
 
     broad_income = st.number_input(
@@ -31,9 +29,7 @@ def run_streamlit_app(gpt_client):
 
     if st.button("Run Simulation"):
         simulation = TaxSimulation(gpt_client, params)
-        df = simulation.run_bulk_simulation(
-            broad_income, broad_income, 1, prior_rate
-        )
+        df = simulation.run_bulk_simulation(broad_income, broad_income, 1, prior_rate)
 
         # Display results and create visualizations
         st.write(df)

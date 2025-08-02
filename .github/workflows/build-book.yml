@@ -1,5 +1,6 @@
 name: Build JupyterBook
 
+# Builds and deploys the JupyterBook
 on:
   push:
     branches: [ main ]

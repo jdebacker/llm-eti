@@ -2,7 +2,8 @@
 """Analyze PKNF results from Gemini."""
 
 import pandas as pd
-from llm_eti.pknf_analysis import run_did_analysis, calculate_bunching_eti
+
+from llm_eti.pknf_analysis import calculate_bunching_eti, run_did_analysis
 
 
 def main():

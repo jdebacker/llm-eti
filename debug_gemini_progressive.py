@@ -2,7 +2,8 @@
 """Debug Gemini progressive tax question."""
 
 import os
-from edsl import QuestionNumerical, Survey, Jobs, Model, Agent
+
+from edsl import Agent, Jobs, Model, QuestionNumerical, Survey
 
 
 def main():

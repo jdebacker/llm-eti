@@ -134,7 +134,7 @@ Tax system: {tax_desc}"""
 
         # Add note only for progressive tax
         if tax_schedule == "progressive":
-            prompt += f"""
+            prompt += """
 
 Example: Working 20 hours earns $400, taxed at 25% = $100 tax, keeping $300.
 Working 21 hours earns $420, but tax = $110, keeping only $310."""

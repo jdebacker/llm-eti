@@ -1,7 +1,9 @@
 """Test that models provide expected responses - integration test with real API calls."""
 
 import os
+
 import pytest
+
 from llm_eti.edsl_client import EDSLClient
 
 

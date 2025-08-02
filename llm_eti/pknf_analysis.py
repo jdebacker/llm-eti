@@ -28,14 +28,13 @@ def calculate_bunching_eti(df: pd.DataFrame, notch_location: int = 400) -> float
     # Count observations at or just below the notch (380-400 ECU)
     bunching_window = (380, 400)
 
-    flat_mass = (
-        (flat_income >= bunching_window[0]) & (flat_income <= bunching_window[1])
-    ).mean()
-    prog_mass = (
-        (prog_income >= bunching_window[0]) & (prog_income <= bunching_window[1])
-    ).mean()
-
-    # Excess bunching (not used in this simplified calculation)
+    # Calculate bunching mass (not used in this simplified calculation)
+    # flat_mass = (
+    #     (flat_income >= bunching_window[0]) & (flat_income <= bunching_window[1])
+    # ).mean()
+    # prog_mass = (
+    #     (prog_income >= bunching_window[0]) & (prog_income <= bunching_window[1])
+    # ).mean()
     # excess_bunching = prog_mass - flat_mass
 
     # Parameters for ETI calculation

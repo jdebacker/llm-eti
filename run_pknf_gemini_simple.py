@@ -2,6 +2,7 @@
 """Run minimal PKNF simulation with Gemini 2.5 Flash."""
 
 import os
+
 from llm_eti.edsl_client import EDSLClient
 from llm_eti.simulation_engine import LabExperimentSimulation
 
@@ -52,7 +53,7 @@ def main():
         )
 
         # Basic stats
-        print(f"\nAverage labor supply:")
+        print("\nAverage labor supply:")
         print(
             f"- Progressive tax: {df[df['tax_schedule'] == 'progressive']['labor_supply'].mean():.1f}"
         )

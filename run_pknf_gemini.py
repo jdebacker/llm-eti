@@ -2,9 +2,10 @@
 """Run PKNF simulation with Gemini 2.5 Flash."""
 
 import os
+
 from llm_eti.edsl_client import EDSLClient
+from llm_eti.pknf_analysis import calculate_bunching_eti, run_did_analysis
 from llm_eti.simulation_engine import LabExperimentSimulation
-from llm_eti.pknf_analysis import run_did_analysis, calculate_bunching_eti
 
 
 def main():
@@ -42,7 +43,7 @@ def main():
     # Basic analysis
     print("\nBasic Statistics:")
     print(f"- Average labor supply: {df['labor_supply'].mean():.2f}")
-    print(f"- Labor supply by tax schedule:")
+    print("- Labor supply by tax schedule:")
     for schedule in df["tax_schedule"].unique():
         avg = df[df["tax_schedule"] == schedule]["labor_supply"].mean()
         print(f"  - {schedule}: {avg:.2f}")

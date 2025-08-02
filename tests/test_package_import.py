@@ -1,7 +1,6 @@
 """Test that the package imports work correctly."""
 
 
-
 def test_package_imports():
     """Test that all main modules can be imported."""
     # Test main package import

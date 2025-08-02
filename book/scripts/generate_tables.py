@@ -12,7 +12,6 @@ import pandas as pd
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 
-
 def generate_summary_stats_table(df_4o, df_mini, output_path):
     """Generate summary statistics comparison table."""
     stats = []
@@ -73,16 +72,14 @@ def main():
 
     # 2. Try to generate regression table using simple_regression module
     if (
-        (
-            data_dir.parent.parent / "results" / "simulation_4o" / "raw_responses.csv"
-        ).exists()
-    ):
+        data_dir.parent.parent / "results" / "simulation_4o" / "raw_responses.csv"
+    ).exists():
         # Run the regression analysis
         import subprocess
 
         subprocess.run(
-            [sys.executable, "-m", "llm_eti.simple_regression"], 
-            cwd=str(Path(__file__).parent.parent.parent)
+            [sys.executable, "-m", "llm_eti.simple_regression"],
+            cwd=str(Path(__file__).parent.parent.parent),
         )
 
         # Copy the generated table

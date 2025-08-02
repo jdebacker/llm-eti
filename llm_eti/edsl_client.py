@@ -126,17 +126,22 @@ Please provide only a numeric value in dollars."""
             else:  # progressive
                 tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
 
-        prompt = f"""You are participating in an economic experiment (Round {round_num}).
+        # Create base prompt with simpler language
+        prompt = f"""You can work up to {labor_endowment} hours (Round {round_num}).
+Each hour pays ${wage_per_unit}.
 
-You have a labor endowment of {labor_endowment} units.
-Each unit of labor you supply earns you {wage_per_unit} experimental currency units (ECU).
+Tax system: {tax_desc}"""
 
-The tax system is: {tax_desc}
+        # Add note only for progressive tax
+        if tax_schedule == "progressive":
+            prompt += f"""
 
-Note: Under the progressive tax, if you work 20 units you earn 400 ECU and pay 100 ECU in taxes (25%).
-If you work 21 units you earn 420 ECU but pay 110 ECU in taxes, leaving you with less after-tax income.
+Example: Working 20 hours earns $400, taxed at 25% = $100 tax, keeping $300.
+Working 21 hours earns $420, but tax = $110, keeping only $310."""
 
-How many units of labor will you supply? (Enter a number between 0 and {labor_endowment})"""
+        prompt += f"""
+
+How many hours will you work? (0-{labor_endowment})"""
 
         question = QuestionNumerical(
             question_name="labor_supply",

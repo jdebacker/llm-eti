@@ -121,4 +121,3 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: book/_build/html
-        cname: llm-eti.maxghenis.com  # Optional: add your custom domain

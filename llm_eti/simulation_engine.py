@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -138,7 +138,7 @@ class LabExperimentSimulation:
     def run_experiment(
         self,
         treatments: List[str],
-        rounds: int = None,
+        rounds: Optional[int] = None,
         subjects_per_treatment: int = 100,
     ) -> pd.DataFrame:
         """Run the full lab experiment simulation.
@@ -168,8 +168,8 @@ class LabExperimentSimulation:
             for subject_id in range(subjects_per_treatment):
                 # Random labor endowments for each round
                 labor_endowments = np.random.randint(
-                    self.config["labor_endowment_min"],
-                    self.config["labor_endowment_max"] + 1,
+                    int(self.config["labor_endowment_min"]),
+                    int(self.config["labor_endowment_max"]) + 1,
                     size=rounds,
                 )
 

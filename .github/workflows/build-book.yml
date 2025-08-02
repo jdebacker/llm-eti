@@ -1,0 +1,70 @@
+name: Build JupyterBook
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        enable-cache: true
+        cache-dependency-glob: "pyproject.toml"
+    
+    - name: Install dependencies
+      run: |
+        uv sync
+    
+    - name: Run test simulations
+      env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        cd book
+        make test-data
+    
+    - name: Generate figures and tables
+      run: |
+        cd book
+        make figures
+        make tables
+    
+    - name: Build JupyterBook
+      run: |
+        cd book
+        uv run jupyter-book build .
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: jupyterbook-html
+        path: book/_build/html/
+    
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: book/_build/html
+        cname: llm-eti.maxghenis.com  # Optional: add your custom domain

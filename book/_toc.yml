@@ -1,0 +1,13 @@
+# Table of contents
+format: jb-book
+root: intro
+chapters:
+  - file: methods
+  - file: results/pknf_replication
+    title: "Replicating a Lab Experiment"
+  - file: results/gruber_saez_replication
+    title: "Replicating an Observational Study"
+  - file: results/model_comparison
+    title: "Model Comparisons"
+  - file: discussion
+  - file: references

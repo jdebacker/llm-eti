@@ -1,4 +1,4 @@
-.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o
+.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression
 
 install:
 	pip install -r requirements.txt
@@ -38,3 +38,6 @@ analyze-both:
 
 clean:
 	rm -rf results/*
+
+run-simple-regression:
+	python simple_regression.py

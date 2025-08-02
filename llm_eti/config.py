@@ -19,6 +19,7 @@ class Config:
 
     # API Configuration
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    EXPECTED_PARROT_API_KEY = os.getenv("EXPECTED_PARROT_API_KEY")
 
     # Default simulation parameters
     DEFAULT_PARAMS = {
@@ -31,5 +32,5 @@ class Config:
         "responses_per_rate": 100,
         "prior_rate": 0.25,
         "taxable_income_ratio": 0.75,
-        "model": "gpt-4o-mini",
+        "model": "gpt-4o-mini",  # Default model for simulations
     }

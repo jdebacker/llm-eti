@@ -119,4 +119,3 @@ class TestFullSimulations:
         df2 = result2.select("answer.taxable_income").to_pandas()
 
         assert df1.equals(df2)
-

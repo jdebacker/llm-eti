@@ -166,4 +166,3 @@ class TestCacheComparison:
 
         # Verify the survey was run twice with different questions
         assert mock_client.run_survey.call_count == 2
-

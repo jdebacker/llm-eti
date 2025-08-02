@@ -146,4 +146,3 @@ def compare_cached_vs_fresh(client, survey, n: int = 10) -> Dict:
     }
 
     return comparison
-

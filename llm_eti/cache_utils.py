@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -21,13 +21,13 @@ class CacheExplorer:
             raise ImportError("EDSL is required for cache exploration")
         self.cache = Cache()
 
-    def get_cache_stats(self) -> Dict:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get statistics about the current cache."""
         try:
             # Get cache entries
             entries = list(self.cache.all())
 
-            stats = {
+            stats: Dict[str, Any] = {
                 "total_entries": len(entries),
                 "models": {},
                 "questions": {},

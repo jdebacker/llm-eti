@@ -34,3 +34,17 @@ class Config:
         "taxable_income_ratio": 0.75,
         "model": "gpt-4o-mini",  # Default model for simulations
     }
+
+    # PKNF experiment parameters
+    PKNF_CONFIG = {
+        "rounds": 16,
+        "reform_round": 8,
+        "labor_endowment_min": 14,
+        "labor_endowment_max": 30,
+        "wage_per_unit": 20,
+        "progressive_threshold": 400,  # 20 units * 20 ECU/unit
+        "progressive_low_rate": 0.25,
+        "progressive_high_rate": 0.50,
+        "flat_25_rate": 0.25,
+        "flat_50_rate": 0.50,
+    }

@@ -65,7 +65,7 @@ class EDSLClient:
         """
         # Debug print
         # print(f"DEBUG: broad_income={broad_income}, type={type(broad_income)}")
-        
+
         # Convert rates to percentages for display
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
@@ -83,7 +83,7 @@ Please provide only a numeric value in dollars."""
         # Ensure numeric types are Python native (not numpy)
         min_val = 0
         max_val = float(broad_income * 2)  # Convert to native Python float
-        
+
         question = QuestionNumerical(
             question_name="taxable_income",
             question_text=prompt,
@@ -111,13 +111,20 @@ Please provide only a numeric value in dollars."""
         Returns:
             EDSL Survey object
         """
-        # Define tax schedule details
-        if tax_schedule == "flat25":
-            tax_desc = "a flat tax rate of 25%"
-        elif tax_schedule == "flat50":
-            tax_desc = "a flat tax rate of 50%"
-        else:  # progressive
-            tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
+        # Try to use enum for better descriptions
+        try:
+            from llm_eti.pknf_types import TaxSchedule
+
+            schedule_enum = TaxSchedule(tax_schedule)
+            tax_desc = schedule_enum.description
+        except (ImportError, ValueError):
+            # Fallback to original logic
+            if tax_schedule == "flat25":
+                tax_desc = "a flat tax rate of 25%"
+            elif tax_schedule == "flat50":
+                tax_desc = "a flat tax rate of 50%"
+            else:  # progressive
+                tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
 
         prompt = f"""You are participating in an economic experiment (Round {round_num}).
 
@@ -125,6 +132,9 @@ You have a labor endowment of {labor_endowment} units.
 Each unit of labor you supply earns you {wage_per_unit} experimental currency units (ECU).
 
 The tax system is: {tax_desc}
+
+Note: Under the progressive tax, if you work 20 units you earn 400 ECU and pay 100 ECU in taxes (25%).
+If you work 21 units you earn 420 ECU but pay 110 ECU in taxes, leaving you with less after-tax income.
 
 How many units of labor will you supply? (Enter a number between 0 and {labor_endowment})"""
 
@@ -188,26 +198,26 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
 
             # Create multiple agents for batch processing
             agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
-            
+
             # Handle model creation with service names
             if self.model.startswith("gemini-"):
                 model = Model(self.model, service_name="google")
             else:
                 model = Model(self.model)
-            
+
             # Run all agents at once
             job = Jobs(survey=survey, agents=agents, models=[model])
             results = job.run(cache=self.use_cache)
-            
+
             # Extract results to DataFrame
             df = results.to_pandas()
-            
+
             # Process each response
             for idx, row in df.iterrows():
                 result_dict = scenario.copy()
                 result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
                 result_dict["model"] = row.get("model.model", self.model)
-                
+
                 # Calculate ETI for tax surveys
                 if survey_type == "tax":
                     eti = self.calculate_eti(
@@ -217,7 +227,7 @@ How many units of labor will you supply? (Enter a number between 0 and {labor_en
                         row[f"answer.{result_key}"],
                     )
                     result_dict["implied_eti"] = eti
-                
+
                 all_results.append(result_dict)
 
         return all_results

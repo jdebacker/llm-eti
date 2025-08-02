@@ -44,49 +44,49 @@ jobs:
         cd book
         mkdir -p data
         # Create more realistic placeholder CSV files with multiple rows
-        cat > data/pknf_results_gpt-4o-mini_test.csv << EOF
-round,rate1,rate2,treatment,max_labor,chosen_labor,personality,raw_response
-1,25,50,prog_flat25,600,400,Standard,Test response
-2,25,50,prog_flat25,500,350,Standard,Test response
-3,25,50,prog_flat25,400,300,Standard,Test response
-4,25,50,prog_flat25,300,250,Standard,Test response
-EOF
+        cat > data/pknf_results_gpt-4o-mini_test.csv << 'EOF'
+        round,rate1,rate2,treatment,max_labor,chosen_labor,personality,raw_response
+        1,25,50,prog_flat25,600,400,Standard,Test response
+        2,25,50,prog_flat25,500,350,Standard,Test response
+        3,25,50,prog_flat25,400,300,Standard,Test response
+        4,25,50,prog_flat25,300,250,Standard,Test response
+        EOF
         
         # Create data with multiple income levels and data points per bin
-        cat > data/gruber_saez_results_gpt-4o-mini_test.csv << EOF
-broad_income,taxable_income,mtr_last,mtr_this,taxable_income_this,implied_eti,raw_response
-50000,37500,0.25,0.30,35000,0.4,Test response
-55000,41250,0.25,0.30,38500,0.4,Test response
-60000,45000,0.25,0.30,42000,0.4,Test response
-65000,48750,0.25,0.30,45500,0.4,Test response
-70000,52500,0.25,0.30,49000,0.4,Test response
-75000,56250,0.30,0.35,51500,0.5,Test response
-80000,60000,0.30,0.35,55000,0.5,Test response
-85000,63750,0.30,0.35,58500,0.5,Test response
-90000,67500,0.30,0.35,62000,0.5,Test response
-95000,71250,0.30,0.35,65500,0.5,Test response
-100000,75000,0.30,0.35,69000,0.5,Test response
-105000,78750,0.35,0.40,72000,0.6,Test response
-110000,82500,0.35,0.40,75000,0.6,Test response
-115000,86250,0.35,0.40,78500,0.6,Test response
-120000,90000,0.35,0.40,82000,0.6,Test response
-125000,93750,0.35,0.40,85500,0.6,Test response
-130000,97500,0.35,0.40,89000,0.6,Test response
-135000,101250,0.35,0.40,92500,0.6,Test response
-140000,105000,0.35,0.40,96000,0.6,Test response
-145000,108750,0.35,0.40,99500,0.6,Test response
-150000,112500,0.35,0.40,103000,0.6,Test response
-155000,116250,0.35,0.40,106500,0.6,Test response
-160000,120000,0.35,0.40,110000,0.6,Test response
-165000,123750,0.35,0.40,113500,0.6,Test response
-170000,127500,0.35,0.40,117000,0.6,Test response
-175000,131250,0.35,0.40,120500,0.6,Test response
-180000,135000,0.35,0.40,124000,0.6,Test response
-185000,138750,0.35,0.40,127500,0.6,Test response
-190000,142500,0.35,0.40,131000,0.6,Test response
-195000,146250,0.35,0.40,134500,0.6,Test response
-200000,150000,0.35,0.40,138000,0.6,Test response
-EOF
+        cat > data/gruber_saez_results_gpt-4o-mini_test.csv << 'EOF'
+        broad_income,taxable_income,mtr_last,mtr_this,taxable_income_this,implied_eti,raw_response
+        50000,37500,0.25,0.30,35000,0.4,Test response
+        55000,41250,0.25,0.30,38500,0.4,Test response
+        60000,45000,0.25,0.30,42000,0.4,Test response
+        65000,48750,0.25,0.30,45500,0.4,Test response
+        70000,52500,0.25,0.30,49000,0.4,Test response
+        75000,56250,0.30,0.35,51500,0.5,Test response
+        80000,60000,0.30,0.35,55000,0.5,Test response
+        85000,63750,0.30,0.35,58500,0.5,Test response
+        90000,67500,0.30,0.35,62000,0.5,Test response
+        95000,71250,0.30,0.35,65500,0.5,Test response
+        100000,75000,0.30,0.35,69000,0.5,Test response
+        105000,78750,0.35,0.40,72000,0.6,Test response
+        110000,82500,0.35,0.40,75000,0.6,Test response
+        115000,86250,0.35,0.40,78500,0.6,Test response
+        120000,90000,0.35,0.40,82000,0.6,Test response
+        125000,93750,0.35,0.40,85500,0.6,Test response
+        130000,97500,0.35,0.40,89000,0.6,Test response
+        135000,101250,0.35,0.40,92500,0.6,Test response
+        140000,105000,0.35,0.40,96000,0.6,Test response
+        145000,108750,0.35,0.40,99500,0.6,Test response
+        150000,112500,0.35,0.40,103000,0.6,Test response
+        155000,116250,0.35,0.40,106500,0.6,Test response
+        160000,120000,0.35,0.40,110000,0.6,Test response
+        165000,123750,0.35,0.40,113500,0.6,Test response
+        170000,127500,0.35,0.40,117000,0.6,Test response
+        175000,131250,0.35,0.40,120500,0.6,Test response
+        180000,135000,0.35,0.40,124000,0.6,Test response
+        185000,138750,0.35,0.40,127500,0.6,Test response
+        190000,142500,0.35,0.40,131000,0.6,Test response
+        195000,146250,0.35,0.40,134500,0.6,Test response
+        200000,150000,0.35,0.40,138000,0.6,Test response
+        EOF
     
     - name: Generate figures and tables
       run: |

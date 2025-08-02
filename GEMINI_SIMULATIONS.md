@@ -1,14 +1,14 @@
 # Gemini Model Simulations
 
-This document describes the full-scale simulations run with Google's Gemini 2.0 models.
+This document describes the full-scale simulations run with Google's Gemini 2.5 models.
 
 ## Models Used
 
-1. **gemini-2.0-flash** - Google's latest fast model
+1. **gemini-2.5-flash** - Google's latest fast model
    - Cost: $0.10/$0.40 per 1M tokens
    - Estimated simulation cost: $1.79
 
-2. **gemini-2.0-flash-lite** - Lighter, more efficient variant
+2. **gemini-2.5-flash-lite** - Lighter, more efficient variant
    - Cost: $0.075/$0.30 per 1M tokens  
    - Estimated simulation cost: $1.34
 
@@ -41,10 +41,10 @@ export EXPECTED_PARROT_API_KEY=your-key-here
 ## Expected Output
 
 Each simulation produces a CSV file in `book/data/`:
-- `gruber_saez_results_gemini-2.0-flash.csv`
-- `gruber_saez_results_gemini-2.0-flash-lite.csv`
-- `pknf_results_gemini-2.0-flash.csv`
-- `pknf_results_gemini-2.0-flash-lite.csv`
+- `gruber_saez_results_gemini-2.5-flash.csv`
+- `gruber_saez_results_gemini-2.5-flash-lite.csv`
+- `pknf_results_gemini-2.5-flash.csv`
+- `pknf_results_gemini-2.5-flash-lite.csv`
 
 ## Analysis
 

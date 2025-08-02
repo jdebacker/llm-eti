@@ -70,15 +70,16 @@ class EDSLClient:
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
 
-        prompt = f"""You are a taxpayer with the following tax profile:
-- Your broad income last year was ${broad_income:,.0f}
-- Your taxable income last year was ${taxable_income:,.0f}
-- Your marginal tax rate last year was {mtr_last_pct}%
+        prompt = f"""Last year:
+- Total income: ${broad_income:,.0f}
+- Taxable income: ${taxable_income:,.0f}
+- Tax rate: {mtr_last_pct}%
 
-This year, if you had the same broad income, your marginal tax rate will change to {mtr_this_pct}%.
+This year:
+- Total income: ${broad_income:,.0f} (same)
+- Tax rate: {mtr_this_pct}%
 
-Given this change, estimate your taxable income for this year. 
-Please provide only a numeric value in dollars."""
+What will your taxable income be this year? (Enter a number between 0 and {broad_income:,.0f})"""
 
         # Ensure numeric types are Python native (not numpy)
         min_val = 0

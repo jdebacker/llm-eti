@@ -25,7 +25,7 @@ def main():
     # Check if data exists - try EDSL format first, then legacy
     test_mode = False
     edsl_mode = False
-    
+
     # Check for EDSL format first
     if (data_dir / "gruber_saez_results_gpt-4o-mini_edsl.csv").exists():
         edsl_mode = True
@@ -45,11 +45,15 @@ def main():
     # Load Gruber & Saez results
     suffix = "_test" if test_mode else ""
     edsl_suffix = "_edsl" if edsl_mode else ""
-    
+
     try:
-        gs_mini = pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o-mini{edsl_suffix}{suffix}.csv")
+        gs_mini = pd.read_csv(
+            data_dir / f"gruber_saez_results_gpt-4o-mini{edsl_suffix}{suffix}.csv"
+        )
         gs_4o = (
-            pd.read_csv(data_dir / f"gruber_saez_results_gpt-4o{edsl_suffix}{suffix}.csv")
+            pd.read_csv(
+                data_dir / f"gruber_saez_results_gpt-4o{edsl_suffix}{suffix}.csv"
+            )
             if not test_mode
             else gs_mini.copy()
         )

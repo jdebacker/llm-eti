@@ -31,28 +31,28 @@ def main():
 
     # Set parameters
     num_subjects = 10 if args.test else 100
-    
+
     # All treatments from PKNF
     treatments = [
         "Prog,Prog",
-        "Prog,Flat25", 
+        "Prog,Flat25",
         "Prog,Flat50",
         "Flat25,Prog",
-        "Flat50,Prog"
+        "Flat50,Prog",
     ]
 
-    print(f"Running PKNF simulation with {args.model} ({num_subjects} subjects per treatment)...")
+    print(
+        f"Running PKNF simulation with {args.model} ({num_subjects} subjects per treatment)..."
+    )
     print("Using EDSL with universal cache enabled")
 
     # Initialize client and experiment
     client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
     experiment = LabExperimentSimulation(client)
-    
+
     # Run experiment
     results_df = experiment.run_experiment(
-        treatments=treatments,
-        rounds=16,
-        subjects_per_treatment=num_subjects
+        treatments=treatments, rounds=16, subjects_per_treatment=num_subjects
     )
 
     # Save results

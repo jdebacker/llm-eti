@@ -16,7 +16,9 @@ from llm_eti.simulation_engine_edsl import SimulationParams, TaxSimulation
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run Gruber & Saez simulation with EDSL")
+    parser = argparse.ArgumentParser(
+        description="Run Gruber & Saez simulation with EDSL"
+    )
     parser.add_argument(
         "--test", action="store_true", help="Run in test mode with fewer scenarios"
     )

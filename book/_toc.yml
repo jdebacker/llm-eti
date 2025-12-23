@@ -4,10 +4,10 @@ root: intro
 chapters:
   - file: methods
   - file: results/pknf_replication
-    title: "Replicating a Lab Experiment"
-  - file: results/gruber_saez_replication
-    title: "Replicating an Observational Study"
+    title: "Study 1: Lab Experiment Replication"
+  - file: results/tax_survey
+    title: "Study 2: Tax Response Survey"
   - file: results/model_comparison
-    title: "Model Comparisons"
+    title: "Cross-Model Analysis"
   - file: discussion
   - file: references

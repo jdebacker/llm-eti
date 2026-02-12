@@ -1,0 +1,27 @@
+name: llm-eti-env
+channels:
+- conda-forge
+- plotly
+dependencies:
+- streamlit
+- openai
+- matplotlib
+- black
+- pandas
+- numpy
+- seaborn
+- python-dotenv
+- click
+- tqdm
+- tabulate
+- nbformat
+- python-kaleido
+- scikit-learn
+- statsmodels
+- plotly_express
+- pip
+- pip:
+  - stargazer
+  - anthropic
+  - policyengine
+  - policyengine-us

@@ -104,10 +104,21 @@ jobs:
         cd book
         uv run python scripts/check_missing_images.py
     
+    - name: Install LaTeX
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra latexmk texlive-xetex
+
     - name: Build JupyterBook
       run: |
         cd book
         uv run jupyter-book build .
+
+    - name: Build PDF
+      run: |
+        cd book
+        uv run jupyter-book build . --builder pdflatex || true
+        cp _build/latex/*.pdf _build/html/ 2>/dev/null || true
     
     - name: Upload artifact
       uses: actions/upload-artifact@v4

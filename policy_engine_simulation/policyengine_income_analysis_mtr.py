@@ -99,7 +99,7 @@ for year, filename in YEARS.items():
         household_weight = f["household_weight"][:]
         person_hh_id = f["person_household_id"][:]
 
-        broad_vars = [v for v in BROAD_INCOME_VARS if v in keys]
+        broad_vars = [v for v in MARKET_INCOME_VARS if v in keys]
         taxable_vars = [v for v in TAXABLE_INCOME_VARS if v in keys]
 
         broad_person = sum(f[v][:] for v in broad_vars)
@@ -186,7 +186,7 @@ df_final = pd.read_csv("policyengine_sample_incomes.csv")
 # Perturb mtr by adding random noise
 RANDOM_SEED = 42
 np.random.seed(RANDOM_SEED)
-df_final["mtr_prime"] = df["mtr_approx"] + np.random.normal(0, 0.025, size=len(df))
+df_final["mtr_prime"] = df["mtr"] + np.random.normal(0, 0.025, size=len(df))
 
 # Export
 df_final.to_csv("policyengine_sample_incomes.csv", index=False)

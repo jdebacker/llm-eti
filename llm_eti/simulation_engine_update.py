@@ -57,7 +57,7 @@ class TaxSimulation:
         """Run simulation for a single household scenario.
 
         Args:
-            row: Dict with broad_income, taxable_income, mtr_approx, mtr_prime
+            row: Dict with broad_income, taxable_income, mtr, mtr_prime
 
         Returns:
             List of result dicts (one per LLM response)
@@ -67,7 +67,7 @@ class TaxSimulation:
         scenario = {
             "broad_income": row["broad_income"],
             "taxable_income": row["taxable_income"],
-            "mtr_last": row["mtr_approx"],
+            "mtr_last": row["mtr"],
             "mtr_this": row["mtr_prime"],
         }
 
@@ -87,7 +87,7 @@ class TaxSimulation:
                         "filing_status": row.get("filing_status"),
                         "broad_income": row["broad_income"],
                         "taxable_income": row["taxable_income"],
-                        "mtr_approx": row["mtr_approx"],
+                        "mtr": row["mtr"],
                         "mtr_prime": row["mtr_prime"],
                         "response_number": i + 1,
                         "taxable_income_this": result.get("taxable_income_this"),

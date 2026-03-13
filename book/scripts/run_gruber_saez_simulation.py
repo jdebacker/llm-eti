@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-Run updated Gruber & Saez observational study replication using PolicyEngine inputs.
+Run Gruber & Saez observational study replication using PolicyEngine inputs.
 
 Reads household-level broad income, taxable income, and marginal tax rates from
 a PolicyEngine-generated CSV, queries the LLM for both taxable and broad income
@@ -15,8 +14,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
-from llm_eti.edsl_client_update import EDSLClient
-from llm_eti.simulation_engine_update import SimulationParams, TaxSimulation
+from llm_eti.edsl_client import EDSLClient
+from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
 CSV_PATH = (
     Path(__file__).parent.parent.parent
@@ -27,7 +26,7 @@ CSV_PATH = (
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run updated Gruber & Saez simulation from PolicyEngine inputs"
+        description="Run Gruber & Saez simulation from PolicyEngine inputs"
     )
     parser.add_argument(
         "--test", action="store_true", help="Run in test mode (1 household)"
@@ -47,7 +46,7 @@ def main():
         print(f"Error: input CSV not found at {CSV_PATH}")
         sys.exit(1)
 
-    print(f"Running updated Gruber & Saez simulation with {args.model}...")
+    print(f"Running Gruber & Saez simulation with {args.model}...")
     print(f"Input CSV: {CSV_PATH}")
 
     client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
@@ -62,7 +61,7 @@ def main():
     output_dir = Path(__file__).parent.parent / "data"
     output_dir.mkdir(exist_ok=True)
 
-    filename = f"gruber_saez_results_update_{args.model}"
+    filename = f"gruber_saez_results_{args.model}"
     if args.test:
         filename += "_test"
     filename += ".csv"

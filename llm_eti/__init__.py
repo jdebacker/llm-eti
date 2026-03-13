@@ -18,7 +18,7 @@ from .experiment import (
 )
 from .personas import Persona, create_persona, sample_personas
 from .simulation_engine import (
-    LabExperimentSimulation,
+    # LabExperimentSimulation,  #TODO: will need to update when want to add lab experiment functionality back in
     SimulationParams,
     TaxSimulation,
 )

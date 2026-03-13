@@ -3,6 +3,7 @@ channels:
 - conda-forge
 - plotly
 dependencies:
+- python>3.11, <3.14
 - streamlit
 - openai
 - matplotlib
@@ -19,6 +20,7 @@ dependencies:
 - scikit-learn
 - statsmodels
 - plotly_express
+- hdf5
 - pip
 - pip:
   - stargazer

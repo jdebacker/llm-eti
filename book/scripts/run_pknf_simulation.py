@@ -18,14 +18,20 @@ from llm_eti.simulation_engine import LabExperimentSimulation
 def main():
     parser = argparse.ArgumentParser(description="Run PKNF simulation with EDSL")
     parser.add_argument(
-        "--test", action="store_true", help="Run in test mode with fewer subjects"
+        "--test",
+        action="store_true",
+        help="Run in test mode with fewer subjects",
     )
     parser.add_argument("--model", default="gpt-4o-mini", help="LLM model to use")
     parser.add_argument(
-        "--production", action="store_true", help="Run full production simulation"
+        "--production",
+        action="store_true",
+        help="Run full production simulation",
     )
     parser.add_argument(
-        "--cache-analysis", action="store_true", help="Analyze cache usage after run"
+        "--cache-analysis",
+        action="store_true",
+        help="Analyze cache usage after run",
     )
     args = parser.parse_args()
 

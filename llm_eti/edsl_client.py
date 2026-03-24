@@ -1,21 +1,14 @@
-"""EDSL client for running LLM surveys."""
+"""OpenAI client for running tax simulations with two-outcome prompt."""
 
 import os
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
-
-try:
-    from edsl import Agent, Jobs, Model, Question, Survey
-    from edsl.questions import QuestionNumerical
-except ImportError:
-    # For testing without EDSL installed
-    Question = Survey = Agent = Model = Jobs = None
-    QuestionNumerical = None
+from openai import OpenAI
 
 
 class EDSLClient:
-    """Client for conducting surveys using EDSL."""
+    """Client for querying OpenAI models directly."""
 
     def __init__(
         self,
@@ -23,218 +16,124 @@ class EDSLClient:
         model: str = "gpt-4o-mini",
         use_cache: bool = True,
     ):
-        """Initialize EDSL client.
-
-        Args:
-            api_key: Expected Parrot API key. If None, loads from environment.
-            model: Model to use for surveys (default: gpt-4o-mini for cost efficiency)
-            use_cache: Whether to use EDSL's universal cache (default: True)
-        """
         load_dotenv()
 
-        self.api_key = api_key or os.getenv("EXPECTED_PARROT_API_KEY")
+        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
-            raise ValueError(
-                "EXPECTED_PARROT_API_KEY not found in environment or arguments"
-            )
+            raise ValueError("OPENAI_API_KEY not found in environment or arguments")
 
         self.model = model
         self.use_cache = use_cache
+        self.client = OpenAI(api_key=self.api_key)
 
-        # Set API key for EDSL
-        if self.api_key:
-            os.environ["EXPECTED_PARROT_API_KEY"] = self.api_key
-
-    def create_tax_survey(
+    def build_prompt(
         self,
         broad_income: float,
         taxable_income: float,
         mtr_last: float,
         mtr_this: float,
-    ) -> "Survey":
-        """Create a tax survey for Gruber & Saez replication.
-
-        Args:
-            broad_income: Broad income last year
-            taxable_income: Taxable income last year
-            mtr_last: Marginal tax rate last year (as decimal)
-            mtr_this: Marginal tax rate this year (as decimal)
-
-        Returns:
-            EDSL Survey object
-        """
-        # Debug print
-        # print(f"DEBUG: broad_income={broad_income}, type={type(broad_income)}")
-
-        # Convert rates to percentages for display
+    ) -> str:
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
 
-        prompt = f"""Last year:
-- Total income: ${broad_income:,.0f}
-- Taxable income: ${taxable_income:,.0f}
-- Tax rate: {mtr_last_pct}%
+        return f"""You are a taxpayer with the following profile:
+- Last year, your broad income was ${broad_income:,.0f}
+- Last year, your taxable income was ${taxable_income:,.0f}
+- Last year, your marginal tax rate was {mtr_last_pct}%
 
-This year:
-- Total income: ${broad_income:,.0f} (same)
-- Tax rate: {mtr_this_pct}%
+Due to a change in tax law, your marginal tax rate this year will be {mtr_this_pct}%.
+Your broad income before any adjustments would be approximately the same as last year.
 
-What will your taxable income be this year? (Enter a number between 0 and {broad_income:,.0f})"""
+Given this change in tax rates, you may adjust your behavior -- for example,
+how much you work, your charitable contributions, retirement savings, or the
+timing of income realizations like capital gains. What would your taxable
+income be this year? And what would your broad income be?
 
-        # Ensure numeric types are Python native (not numpy)
-        min_val = 0
-        max_val = float(broad_income * 2)  # Convert to native Python float
+Respond with exactly two lines:
+TAXABLE_INCOME: <number>
+BROAD_INCOME: <number>"""
 
-        question = QuestionNumerical(
-            question_name="taxable_income",
-            question_text=prompt,
-            min_value=min_val,
-            max_value=max_val,  # Allow for some flexibility
-        )
-
-        return Survey([question])
-
-    def create_lab_experiment_survey(
-        self,
-        round_num: int,
-        tax_schedule: str,
-        labor_endowment: int,
-        wage_per_unit: int = 20,
-    ) -> "Survey":
-        """Create survey for PKNF lab experiment replication.
-
-        Args:
-            round_num: Round number (1-16)
-            tax_schedule: Tax schedule type ("flat25", "flat50", "progressive")
-            labor_endowment: Maximum labor units available
-            wage_per_unit: Wage per unit of labor (default: 20)
+    def query(self, prompt: str) -> Optional[Dict[str, float]]:
+        """Send prompt to OpenAI and parse the two numeric responses.
 
         Returns:
-            EDSL Survey object
+            Dict with 'taxable_income' and 'broad_income', or None on failure.
         """
-        # Try to use enum for better descriptions
-        try:
-            from llm_eti.pknf_types import TaxSchedule
-
-            schedule_enum = TaxSchedule(tax_schedule)
-            tax_desc = schedule_enum.description
-        except (ImportError, ValueError):
-            # Fallback to original logic
-            if tax_schedule == "flat25":
-                tax_desc = "a flat tax rate of 25%"
-            elif tax_schedule == "flat50":
-                tax_desc = "a flat tax rate of 50%"
-            else:  # progressive
-                tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
-
-        # Create base prompt with simpler language
-        prompt = f"""You can work up to {labor_endowment} hours (Round {round_num}).
-Each hour pays ${wage_per_unit}.
-
-Tax system: {tax_desc}"""
-
-        # Add note only for progressive tax
-        if tax_schedule == "progressive":
-            prompt += """
-
-Example: Working 20 hours earns $400, taxed at 25% = $100 tax, keeping $300.
-Working 21 hours earns $420, but tax = $110, keeping only $310."""
-
-        prompt += f"""
-
-How many hours will you work? (0-{labor_endowment})"""
-
-        question = QuestionNumerical(
-            question_name="labor_supply",
-            question_text=prompt,
-            min_value=0,
-            max_value=labor_endowment,
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=1.0,
         )
+        text = response.choices[0].message.content.strip()
 
-        return Survey([question])
+        taxable = None
+        broad = None
+        for line in text.splitlines():
+            line = line.strip()
+            if line.upper().startswith("TAXABLE_INCOME:"):
+                try:
+                    taxable = float(line.split(":", 1)[1].strip().replace(",", ""))
+                except ValueError:
+                    pass
+            elif line.upper().startswith("BROAD_INCOME:"):
+                try:
+                    broad = float(line.split(":", 1)[1].strip().replace(",", ""))
+                except ValueError:
+                    pass
 
-    def run_survey(self, survey: "Survey", agent: Optional["Agent"] = None) -> Any:
-        """Run a single survey.
+        if taxable is None or broad is None:
+            print(f"  Warning: could not parse response:\n{text}")
+            return None
 
-        Args:
-            survey: EDSL Survey object
-            agent: Optional Agent with specific traits
-
-        Returns:
-            Survey results
-        """
-        # Handle model creation with service names for specific providers
-        if self.model.startswith("gemini-"):
-            model = Model(self.model, service_name="google")
-        else:
-            model = Model(self.model)
-
-        if agent:
-            job = Jobs(survey=survey, agents=[agent], models=[model])
-        else:
-            job = Jobs(survey=survey, models=[model])
-
-        # Run with caching enabled by default
-        results = job.run(cache=self.use_cache)
-
-        return results
+        return {"taxable_income": taxable, "broad_income": broad}
 
     def run_batch_surveys(
-        self, scenarios: List[Dict[str, Any]], n: int = 1, survey_type: str = "tax"
-    ) -> List[Dict[str, Any]]:
-        """Run multiple survey scenarios.
+        self, scenarios: List[Dict], n: int = 1, survey_type: str = "tax"
+    ) -> List[Dict]:
+        """Run n queries for each scenario and return results.
 
         Args:
-            scenarios: List of scenario dictionaries
-            n: Number of responses per scenario
-            survey_type: Type of survey ("tax" or "lab")
+            scenarios: List of scenario dicts (broad_income, taxable_income, mtr_last, mtr_this)
+            n: Number of LLM responses per scenario
+            survey_type: Only "tax" is supported in this client
 
         Returns:
-            List of result dictionaries
+            List of result dicts
         """
         all_results = []
 
         for scenario in scenarios:
-            if survey_type == "tax":
-                survey = self.create_tax_survey(**scenario)
-                result_key = "taxable_income"
-            else:  # lab
-                survey = self.create_lab_experiment_survey(**scenario)
-                result_key = "labor_supply"
+            prompt = self.build_prompt(
+                broad_income=scenario["broad_income"],
+                taxable_income=scenario["taxable_income"],
+                mtr_last=scenario["mtr_last"],
+                mtr_this=scenario["mtr_this"],
+            )
 
-            # Create multiple agents for batch processing
-            agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
+            for _ in range(n):
+                parsed = self.query(prompt)
+                if parsed is None:
+                    continue
 
-            # Handle model creation with service names
-            if self.model.startswith("gemini-"):
-                model = Model(self.model, service_name="google")
-            else:
-                model = Model(self.model)
+                result = scenario.copy()
+                result["taxable_income_this"] = parsed["taxable_income"]
+                result["broad_income_this"] = parsed["broad_income"]
+                result["model"] = self.model
 
-            # Run all agents at once
-            job = Jobs(survey=survey, agents=agents, models=[model])
-            results = job.run(cache=self.use_cache)
+                result["implied_eti_taxable"] = self.calculate_eti(
+                    scenario["mtr_last"],
+                    scenario["mtr_this"],
+                    scenario["taxable_income"],
+                    parsed["taxable_income"],
+                )
+                result["implied_eti_broad"] = self.calculate_eti(
+                    scenario["mtr_last"],
+                    scenario["mtr_this"],
+                    scenario["broad_income"],
+                    parsed["broad_income"],
+                )
 
-            # Extract results to DataFrame
-            df = results.to_pandas()
-
-            # Process each response
-            for idx, row in df.iterrows():
-                result_dict = scenario.copy()
-                result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
-                result_dict["model"] = row.get("model.model", self.model)
-
-                # Calculate ETI for tax surveys
-                if survey_type == "tax":
-                    eti = self.calculate_eti(
-                        scenario["mtr_last"],
-                        scenario["mtr_this"],
-                        scenario["taxable_income"],
-                        row[f"answer.{result_key}"],
-                    )
-                    result_dict["implied_eti"] = eti
-
-                all_results.append(result_dict)
+                all_results.append(result)
 
         return all_results
 
@@ -242,26 +141,13 @@ How many hours will you work? (0-{labor_endowment})"""
     def calculate_eti(
         initial_rate: float, new_rate: float, initial_income: float, new_income: float
     ) -> Optional[float]:
-        """Calculate elasticity of taxable income.
-
-        Args:
-            initial_rate: Initial marginal tax rate
-            new_rate: New marginal tax rate
-            initial_income: Initial income
-            new_income: New income
-
-        Returns:
-            ETI value or None if calculation fails
-        """
         try:
             percent_change_income = (new_income - initial_income) / initial_income
             percent_change_net_of_tax_rate = ((1 - new_rate) - (1 - initial_rate)) / (
                 1 - initial_rate
             )
-
             if percent_change_net_of_tax_rate == 0:
                 return None
-
             return percent_change_income / percent_change_net_of_tax_rate
         except (ZeroDivisionError, TypeError):
             return None

@@ -87,6 +87,12 @@ The project is packaged as `llm_eti` with all Python code inside this directory:
    - CI uses `gpt-4o-mini` model to minimize costs
    - Full simulations require explicit commands
 
+## PolicyEngine Simulation (In Development)
+
+See **`POLICYENGINE_SIMULATION_PROGRESS.md`** for full details on the new updated G-S simulation
+pipeline that reads from PolicyEngine CSV inputs and elicits two income outcomes from the LLM.
+Check this file at the start of any session involving the `_update` scripts.
+
 ## Common Issues and Solutions
 
 ### Mypy Errors

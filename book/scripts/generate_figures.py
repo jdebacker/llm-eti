@@ -132,10 +132,7 @@ def main():
         # Check if we have enough data to plot
         if len(gs_4o) > 0 and len(gs_mini) > 0:
             combined_df = pd.concat(
-                [
-                    gs_4o.assign(model="GPT-4o"),
-                    gs_mini.assign(model="GPT-4o-mini"),
-                ]
+                [gs_4o.assign(model="GPT-4o"), gs_mini.assign(model="GPT-4o-mini")]
             )
             # Only plot if we have sufficient data
             if len(combined_df) > 0 and combined_df["implied_eti"].notna().any():
@@ -155,9 +152,7 @@ def main():
                     )
                     plt.axis("off")
                     plt.savefig(
-                        figures_dir / "eti_by_income.png",
-                        dpi=150,
-                        bbox_inches="tight",
+                        figures_dir / "eti_by_income.png", dpi=150, bbox_inches="tight"
                     )
                     plt.close()
         else:

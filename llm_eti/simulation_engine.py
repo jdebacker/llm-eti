@@ -3,13 +3,13 @@
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, List, Optional
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
 from .edsl_client import EDSLClient
-
 
 @dataclass
 class SimulationParams:
@@ -21,36 +21,68 @@ class SimulationParams:
 
 
 class TaxSimulation:
-    """Tax simulation using EDSL surveys."""
+    """Tax simulation using EDSL surveys.  Inputs from PolicyEngine CSV
+    of broad incomes and tax rates, outputs DataFrame with simulated
+    taxable incomes and implied ETI."""
 
     def __init__(self, edsl_client: EDSLClient, params: SimulationParams):
         self.client = edsl_client
         self.params = params
 
-    def generate_income_ranges(
-        self, min_income: float, max_income: float, step: float
-    ) -> List[float]:
-        return list(np.arange(min_income, max_income + step, step))
+    def load_scenarios(self, csv_path: Path) -> pd.DataFrame:
+        """Load and validate scenarios from PolicyEngine CSV.
 
-    def run_single_simulation(
-        self, broad_income: float, prior_rate: float, new_rate: float
-    ) -> List[Dict]:
-        """Run a single simulation scenario."""
-        taxable_income = broad_income * self.params.taxable_income_ratio
+        Filters out rows where broad_income or taxable_income is zero,
+        as these produce invalid QuestionNumerical ranges.
+
+        Args:
+            csv_path: Path to policyengine_sample_incomes.csv
+
+        Returns:
+            Filtered DataFrame of valid scenarios
+        """
+        df = pd.read_csv(csv_path)
+
+        n_before = len(df)
+        df = df[(df["broad_income"] > 0) & (df["taxable_income"] > 0)]
+        n_after = len(df)
+
+        if n_before != n_after:
+            print(
+                f"Filtered {n_before - n_after} zero-income rows ({n_after} remaining)"
+            )
+
+        if self.params.test_mode:
+            df = df.sample(n=1, random_state=42)
+            print("Test mode: sampled 1 row")
+
+        return df.reset_index(drop=True)
+
+    def run_single_simulation(self, row: Dict) -> List[Dict]:
+        """Run simulation for a single household scenario.
+
+        Args:
+            row: Dict with broad_income, taxable_income, mtr, mtr_prime
+
+        Returns:
+            List of result dicts (one per LLM response)
+        """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
             # Create scenario for EDSL
             scenario = {
-                "broad_income": broad_income,
-                "taxable_income": taxable_income,
-                "mtr_last": prior_rate,
-                "mtr_this": new_rate,
+                "broad_income": row["broad_income"],
+                "taxable_income": row["taxable_income"],
+                "mtr_last": row["mtr"],
+                "mtr_this": row["mtr_prime"],
             }
 
             # Run survey with EDSL
             results = self.client.run_batch_surveys(
-                [scenario], n=self.params.responses_per_rate, survey_type="tax"
+                [scenario],
+                n=self.params.responses_per_household,
+                survey_type="tax",
             )
 
             # Format results to match existing structure
@@ -59,14 +91,17 @@ class TaxSimulation:
                 formatted_results.append(
                     {
                         "timestamp": timestamp,
-                        "broad_income": broad_income,
-                        "prior_taxable_income": taxable_income,
-                        "prior_rate": prior_rate,
-                        "new_rate": new_rate,
+                        "household_id": row.get("household_id"),
+                        "filing_status": row.get("filing_status"),
+                        "broad_income": row["broad_income"],
+                        "taxable_income": row["taxable_income"],
+                        "mtr": row["mtr"],
+                        "mtr_prime": row["mtr_prime"],
                         "response_number": i + 1,
-                        "raw_response": f"Taxable income: {result['taxable_income_this']}",
-                        "parsed_income": result["taxable_income_this"],
-                        "implied_eti": result.get("implied_eti"),
+                        "taxable_income_this": result.get("taxable_income_this"),
+                        "broad_income_this": result.get("broad_income_this"),
+                        "implied_eti_taxable": result.get("implied_eti_taxable"),
+                        "implied_eti_broad": result.get("implied_eti_broad"),
                         "model": result.get("model", self.client.model),
                     }
                 )
@@ -76,37 +111,29 @@ class TaxSimulation:
         except Exception as e:
             import traceback
 
-            print(f"\nError in simulation for income {broad_income}, rate {new_rate}:")
+            print(f"\nError in simulation for income {row['broad_income']}, rate {row['mtr_prime']}:")
             print(f"Error type: {type(e).__name__}")
             print(f"Error message: {str(e)}")
             traceback.print_exc()
             return []
 
-    def run_bulk_simulation(
-        self,
-        min_income: float,
-        max_income: float,
-        income_step: float,
-        prior_rate: float,
-    ) -> pd.DataFrame:
-        """Run bulk simulations across income and tax rate ranges."""
-        all_results = []
-        income_ranges = self.generate_income_ranges(min_income, max_income, income_step)
-        tax_rates = np.arange(
-            self.params.min_rate,
-            self.params.max_rate + self.params.step_size,
-            self.params.step_size,
-        )
+    def run_bulk_simulation(self, csv_path: Path) -> pd.DataFrame:
+        """Run simulations for all households in the CSV.
 
-        total_simulations = len(income_ranges) * len(tax_rates)
-        with tqdm(total=total_simulations, desc="Running simulations") as pbar:
-            for broad_income in income_ranges:
-                for rate in tax_rates:
-                    results = self.run_single_simulation(
-                        broad_income, prior_rate, float(rate)
-                    )
-                    all_results.extend(results)
-                    pbar.update(1)
+        Args:
+            csv_path: Path to policyengine_sample_incomes.csv
+
+        Returns:
+            DataFrame of all results
+        """
+        scenarios_df = self.load_scenarios(csv_path)
+        all_results = []
+
+        with tqdm(total=len(scenarios_df), desc="Running simulations") as pbar:
+            for _, row in scenarios_df.iterrows():
+                results = self.run_single_simulation(row.to_dict())
+                all_results.extend(results)
+                pbar.update(1)
 
         return pd.DataFrame(all_results)
 

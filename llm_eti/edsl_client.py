@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 try:
     from edsl import Agent, Jobs, Model, Question, Survey
-    from edsl.questions import QuestionNumerical
+    from edsl.questions import QuestionDict
 except ImportError:
     # For testing without EDSL installed
     Question = Survey = Agent = Model = Jobs = None
@@ -45,6 +45,34 @@ class EDSLClient:
         if self.api_key:
             os.environ["EXPECTED_PARROT_API_KEY"] = self.api_key
 
+    def build_prompt(
+        self,
+        broad_income: float,
+        taxable_income: float,
+        mtr_last: float,
+        mtr_this: float,
+    ) -> str:
+        mtr_last_pct = int(mtr_last * 100)
+        mtr_this_pct = int(mtr_this * 100)
+
+        return f"""You are a taxpayer with the following profile:
+- Last year, your broad income was ${broad_income:,.0f}
+- Last year, your taxable income was ${taxable_income:,.0f}
+- Last year, your marginal tax rate was {mtr_last_pct}%
+
+Due to a change in tax law, your marginal tax rate this year will be {mtr_this_pct}%.
+Your broad income before any adjustments or changes in behavior would be
+approximately the same as last year.
+
+Given this change in tax rates, you may adjust your behavior -- for example,
+how much you work, your charitable contributions, retirement savings, or the
+timing of income realizations like capital gains. What would your broad
+income be this year? And what would your taxable income be?
+
+Respond with exactly two lines:
+BROAD_INCOME: <number>
+TAXABLE_INCOME: <number>"""
+
     def create_tax_survey(
         self,
         broad_income: float,
@@ -63,36 +91,22 @@ class EDSLClient:
         Returns:
             EDSL Survey object
         """
-        # Debug print
-        # print(f"DEBUG: broad_income={broad_income}, type={type(broad_income)}")
+        prompt = self.build_prompt(broad_income, taxable_income, mtr_last, mtr_this)
 
-        # Convert rates to percentages for display
-        mtr_last_pct = int(mtr_last * 100)
-        mtr_this_pct = int(mtr_this * 100)
+        # Will use QuestionDict so we can return two values in a structured way
+        # We can't set numerical bounds here, but can clean later
+        q = QuestionDict(
+                question_name="income_responses",
+                question_text=prompt,
+                answer_keys=["broad_income", "taxable_income"],
+                value_types=[float, float],
+                value_descriptions=[
+                    "Your estimate for broad income.",
+                    "Your estimate for taxable income."
+                    ]
+            )
 
-        prompt = f"""Last year:
-- Total income: ${broad_income:,.0f}
-- Taxable income: ${taxable_income:,.0f}
-- Tax rate: {mtr_last_pct}%
-
-This year:
-- Total income: ${broad_income:,.0f} (same)
-- Tax rate: {mtr_this_pct}%
-
-What will your taxable income be this year? (Enter a number between 0 and {broad_income:,.0f})"""
-
-        # Ensure numeric types are Python native (not numpy)
-        min_val = 0
-        max_val = float(broad_income * 2)  # Convert to native Python float
-
-        question = QuestionNumerical(
-            question_name="taxable_income",
-            question_text=prompt,
-            min_value=min_val,
-            max_value=max_val,  # Allow for some flexibility
-        )
-
-        return Survey([question])
+        return Survey(questions=[q])
 
     def create_lab_experiment_survey(
         self,
@@ -197,7 +211,7 @@ How many hours will you work? (0-{labor_endowment})"""
         for scenario in scenarios:
             if survey_type == "tax":
                 survey = self.create_tax_survey(**scenario)
-                result_key = "taxable_income"
+                result_key = "income_responses"
             else:  # lab
                 survey = self.create_lab_experiment_survey(**scenario)
                 result_key = "labor_supply"
@@ -218,21 +232,32 @@ How many hours will you work? (0-{labor_endowment})"""
             # Extract results to DataFrame
             df = results.to_pandas()
 
+            #TODO: see what this dataframe looks like --- are taxable and broad income returned in one column or two?
+
             # Process each response
             for idx, row in df.iterrows():
                 result_dict = scenario.copy()
                 result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
                 result_dict["model"] = row.get("model.model", self.model)
 
+                parsed_broad_income = scenario.get("broad_income")
+                parsed_table_income = scenario.get("taxable_income")
+
                 # Calculate ETI for tax surveys
                 if survey_type == "tax":
-                    eti = self.calculate_eti(
+                    result_dict["implied_eti_broad"] = self.calculate_eti(
+                        scenario["mtr_last"],
+                        scenario["mtr_this"],
+                        scenario["broad_income"],
+                        parsed_broad_income,
+                    )
+                    result_dict["implied_eti_taxable"] = self.calculate_eti(
                         scenario["mtr_last"],
                         scenario["mtr_this"],
                         scenario["taxable_income"],
-                        row[f"answer.{result_key}"],
+                        parsed_table_income
                     )
-                    result_dict["implied_eti"] = eti
+
 
                 all_results.append(result_dict)
 

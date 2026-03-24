@@ -4,11 +4,17 @@ import os
 from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
-from openai import OpenAI
+try:
+    from edsl import Agent, Jobs, Model, Question, QuestionDict, Survey
+    from edsl.questions import QuestionNumerical
+except ImportError:
+    # For testing without EDSL installed
+    Question = Survey = Agent = Model = Jobs = None
+    QuestionNumerical = None
 
 
 class EDSLClient:
-    """Client for querying OpenAI models directly."""
+    """Client for conducting surveys using EDSL."""
 
     def __init__(
         self,
@@ -16,17 +22,33 @@ class EDSLClient:
         model: str = "gpt-4o-mini",
         use_cache: bool = True,
     ):
+        """Initialize EDSL client.
+
+        Args:
+            api_key: Expected Parrot API key. If None, loads from environment.
+            model: Model to use for surveys (default: gpt-4o-mini for cost efficiency)
+            use_cache: Whether to use EDSL's universal cache (default: True)
+        """
         load_dotenv()
 
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.api_key = api_key or os.getenv("EXPECTED_PARROT_API_KEY")
         if not self.api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment or arguments")
+            raise ValueError(
+                "EXPECTED_PARROT_API_KEY not found in environment or arguments"
+            )
 
         self.model = model
         self.use_cache = use_cache
-        self.client = OpenAI(api_key=self.api_key)
 
-    def build_prompt(
+        # Set API key for EDSL
+        if self.api_key:
+            os.environ["EXPECTED_PARROT_API_KEY"] = self.api_key
+
+        self.model = model
+        self.use_cache = use_cache
+        #TODO: remove/update this for EDSLself.client = OpenAI(api_key=self.api_key)
+
+    def create_tax_survey(
         self,
         broad_income: float,
         taxable_income: float,
@@ -36,7 +58,7 @@ class EDSLClient:
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
 
-        return f"""You are a taxpayer with the following profile:
+        prompt = f"""You are a taxpayer with the following profile:
 - Last year, your broad income was ${broad_income:,.0f}
 - Last year, your taxable income was ${taxable_income:,.0f}
 - Last year, your marginal tax rate was {mtr_last_pct}%
@@ -46,15 +68,34 @@ Your broad income before any adjustments would be approximately the same as last
 
 Given this change in tax rates, you may adjust your behavior -- for example,
 how much you work, your charitable contributions, retirement savings, or the
-timing of income realizations like capital gains. What would your taxable
-income be this year? And what would your broad income be?
+timing of income realizations like capital gains. What would your broad income
+be this year? And what would your taxable income be?
 
 Respond with exactly two lines:
-TAXABLE_INCOME: <number>
-BROAD_INCOME: <number>"""
+BROAD_INCOME: <number>
+TAXABLE_INCOME: <number>"""
 
-    def query(self, prompt: str) -> Optional[Dict[str, float]]:
-        """Send prompt to OpenAI and parse the two numeric responses.
+
+        # Use QuestionDict since two values are related and more token efficient
+        # However, can't enforce numeric responses with QuestionNumerical when using QuestionDict, so we'll parse manually in query()
+        question = QuestionDict(
+            question_name="reported_incomes",
+            question_text=prompt,
+            answer_keys=["broad_income", "taxable_income"],
+            value_types=[float, float],
+            value_descriptions=[
+                "Your estimate for broad income.",
+                "Your estimate for taxable income."
+            ]
+        )
+
+        survey = Survey(questions=[question])
+        results = survey.run()
+
+        return results.select("reported_incomes")
+
+    def survey_query(self, prompt: str) -> Optional[Dict[str, float]]:
+        """Send prompt to LLM and parse the responses.
 
         Returns:
             Dict with 'taxable_income' and 'broad_income', or None on failure.

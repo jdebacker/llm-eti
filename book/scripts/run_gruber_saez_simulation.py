@@ -35,13 +35,18 @@ def main():
     parser.add_argument(
         "--responses", type=int, default=1, help="LLM responses per household"
     )
+    parser.add_argument(
+        "--cache-analysis", action="store_true", help="Analyze cache usage after run"
+    )
     args = parser.parse_args()
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("EXPECTED_PARROT_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
+        print("Error: EXPECTED_PARROT_API_KEY environment variable not set")
         sys.exit(1)
 
+    # Initialize client and parameters
+    client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
     if not CSV_PATH.exists():
         print(f"Error: input CSV not found at {CSV_PATH}")
         sys.exit(1)
@@ -54,6 +59,9 @@ def main():
         responses_per_household=args.responses,
         test_mode=args.test,
     )
+    print("Running simulation with:")
+    print(f"  - Model: {args.model}")
+    print(f"  - Cache enabled: {client.use_cache}")
 
     simulation = TaxSimulation(client, params)
     results_df = simulation.run_bulk_simulation(CSV_PATH)
@@ -69,6 +77,25 @@ def main():
     results_df.to_csv(output_dir / filename, index=False)
     print(f"Results saved to {output_dir / filename}")
     print(f"Total responses: {len(results_df)}")
+    print(f"Cache usage enabled: {client.use_cache}")
+
+    # Analyze cache if requested
+    if args.cache_analysis:
+        from llm_eti.cache_utils import CacheExplorer
+
+        print("\nCache Analysis:")
+        explorer = CacheExplorer()
+        stats = explorer.get_cache_stats()
+
+        if "error" not in stats:
+            print(f"  - Total cache entries: {stats['total_entries']}")
+            print(f"  - Models in cache: {list(stats['models'].keys())}")
+
+            savings = explorer.estimate_cost_savings()
+            if "error" not in savings:
+                print(
+                    f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}"
+                )
 
 
 if __name__ == "__main__":

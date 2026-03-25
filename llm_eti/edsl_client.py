@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 try:
-    from edsl import Agent, Jobs, Model, Question, Survey
+    from edsl import Agent, Jobs, Model, Question, QuestionNumerical, Survey
     from edsl.questions import QuestionDict
 except ImportError:
     # For testing without EDSL installed

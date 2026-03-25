@@ -1932,6 +1932,7 @@ pdf = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mypy" },
     { name = "ruff" },
 ]
 
@@ -1968,7 +1969,10 @@ requires-dist = [
 provides-extras = ["dev", "pdf"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.12.7" }]
+dev = [
+    { name = "mypy", specifier = ">=1.17.1" },
+    { name = "ruff", specifier = ">=0.12.7" },
+]
 
 [[package]]
 name = "lxml"

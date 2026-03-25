@@ -1930,6 +1930,11 @@ pdf = [
     { name = "pyppeteer" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "ruff" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
@@ -1961,6 +1966,9 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.65.0" },
 ]
 provides-extras = ["dev", "pdf"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.12.7" }]
 
 [[package]]
 name = "lxml"

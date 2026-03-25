@@ -1,7 +1,7 @@
 """EDSL client for running LLM surveys."""
 
-import os
 import ast
+import os
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -241,7 +241,7 @@ How many hours will you work? (0-{labor_endowment})"""
                     result_dict = scenario.copy()
                     try:
                         income_response_dict = ast.literal_eval(
-                            row[f"answer.income_responses"]
+                            row["answer.income_responses"]
                         )
                     except ValueError:
                         income_response_dict = {
@@ -256,7 +256,7 @@ How many hours will you work? (0-{labor_endowment})"""
                     ]
                     result_dict["model"] = row.get("model.model", self.model)
                     # save income response in case need to parse later
-                    result_dict["income_response_raw"] = row[f"answer.income_responses"]
+                    result_dict["income_response_raw"] = row["answer.income_responses"]
 
                     parsed_broad_income = income_response_dict["broad_income"]
                     parsed_table_income = income_response_dict["taxable_income"]

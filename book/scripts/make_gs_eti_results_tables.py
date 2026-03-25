@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-import statsmodels.api as sm
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 INPUT_FILE = DATA_DIR / "gruber_saez_results_gpt-4o-mini.csv"
@@ -99,7 +100,7 @@ results_df = pd.DataFrame(
 )
 
 results_df.to_csv(OUTPUT_FILE)
-print(f"\n--------------------------------------------------")
+print("\n--------------------------------------------------")
 print(f"Results saved to {OUTPUT_FILE.name}")
 print("--------------------------------------------------")
 print(results_df)

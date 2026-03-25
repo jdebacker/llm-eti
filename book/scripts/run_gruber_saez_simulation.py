@@ -13,11 +13,18 @@ from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 # Add parent directory to path to import from main project
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
+# set constants
 CSV_PATH = (
     Path(__file__).parent.parent.parent
     / "policy_engine_simulation"
     / "policyengine_sample_incomes.csv"
 )
+ALL_MODELS = [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "deepseek-ai/DeepSeek-V3",
+    "claude-3-haiku-20240307",
+]
 
 
 def main():
@@ -53,33 +60,42 @@ def main():
     print(f"Input CSV: {CSV_PATH}")
 
     # Initialize client and parameters
-    client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
-    params = SimulationParams(
-        responses_per_household=args.responses,
-        test_mode=args.test,
-    )
+    if args.model == "all":
+        model_list = ALL_MODELS
+        print(f"Running with all models: {model_list}")
+    else:
+        model_list = [args.model]
 
-    print("Running simulation with:")
-    print(f"  - Model: {args.model}")
-    print(f"  - Responses per household: {args.responses}")
-    print(f"  - Cache enabled: {client.use_cache}")
+    for model in model_list:
+        client = EDSLClient(api_key=api_key, model=model, use_cache=True)
+        params = SimulationParams(
+            responses_per_household=args.responses,
+            test_mode=args.test,
+        )
 
-    # Run simulation
-    simulation = TaxSimulation(client, params)
-    results_df = simulation.run_bulk_simulation(CSV_PATH)
+        print("Running simulation with:")
+        print(f"  - Model: {model}")
+        print(f"  - Responses per household: {args.responses}")
+        print(f"  - Cache enabled: {client.use_cache}")
 
-    # Save results
-    output_dir = Path(__file__).parent.parent / "data"
-    output_dir.mkdir(exist_ok=True)
+        # Run simulation
+        simulation = TaxSimulation(client, params)
+        results_df = simulation.run_bulk_simulation(CSV_PATH)
 
-    filename = f"gruber_saez_results_{args.model}"
-    if args.test:
-        filename += "_test"
+        # Save results
+        output_dir = Path(__file__).parent.parent / "data"
+        output_dir.mkdir(exist_ok=True)
 
-    results_df.to_csv(output_dir / f"{filename}.csv", index=False)
-    print(f"Results saved to {output_dir / f'{filename}.csv'}")
-    print(f"Total responses: {len(results_df)}")
-    print(f"Cache usage enabled: {client.use_cache}")
+        # if model string has a slash (e.g. "deepseek-ai/DeepSeek-V3"), replace with underscore for filename
+        safe_model_name = model.replace("/", "_")
+        filename = f"gruber_saez_results_{safe_model_name}"
+        if args.test:
+            filename += "_test"
+
+        results_df.to_csv(output_dir / f"{filename}.csv", index=False)
+        print(f"Results saved to {output_dir / f'{filename}.csv'}")
+        print(f"Total responses: {len(results_df)}")
+        print(f"Cache usage enabled: {client.use_cache}")
 
     # Analyze cache if requested
     if args.cache_analysis:

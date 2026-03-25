@@ -1,6 +1,7 @@
 """EDSL client for running LLM surveys."""
 
 import os
+import ast
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -96,15 +97,15 @@ TAXABLE_INCOME: <number>"""
         # Will use QuestionDict so we can return two values in a structured way
         # We can't set numerical bounds here, but can clean later
         q = QuestionDict(
-                question_name="income_responses",
-                question_text=prompt,
-                answer_keys=["broad_income", "taxable_income"],
-                value_types=[float, float],
-                value_descriptions=[
-                    "Your estimate for broad income.",
-                    "Your estimate for taxable income."
-                    ]
-            )
+            question_name="income_responses",
+            question_text=prompt,
+            answer_keys=["broad_income", "taxable_income"],
+            value_types=[float, float],
+            value_descriptions=[
+                "Your estimate for broad income.",
+                "Your estimate for taxable income.",
+            ],
+        )
 
         return Survey(questions=[q])
 
@@ -211,10 +212,8 @@ How many hours will you work? (0-{labor_endowment})"""
         for scenario in scenarios:
             if survey_type == "tax":
                 survey = self.create_tax_survey(**scenario)
-                result_key = "income_responses"
             else:  # lab
                 survey = self.create_lab_experiment_survey(**scenario)
-                result_key = "labor_supply"
 
             # Create multiple agents for batch processing
             agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
@@ -231,20 +230,38 @@ How many hours will you work? (0-{labor_endowment})"""
 
             # Extract results to DataFrame
             df = results.to_pandas()
-
-            #TODO: see what this dataframe looks like --- are taxable and broad income returned in one column or two?
+            df.to_csv(
+                f"edsl_output_{survey_type}_{scenario.get('mtr_this', 'round' + str(scenario.get('round_num', 'unknown')))}.csv",
+                index=False,
+            )
 
             # Process each response
-            for idx, row in df.iterrows():
-                result_dict = scenario.copy()
-                result_dict[f"{result_key}_this"] = row[f"answer.{result_key}"]
-                result_dict["model"] = row.get("model.model", self.model)
+            if survey_type == "tax":
+                for idx, row in df.iterrows():
+                    result_dict = scenario.copy()
+                    try:
+                        income_response_dict = ast.literal_eval(
+                            row[f"answer.income_responses"]
+                        )
+                    except ValueError:
+                        income_response_dict = {
+                            "broad_income": None,
+                            "taxable_income": None,
+                        }
+                    result_dict["broad_income_this"] = income_response_dict[
+                        "broad_income"
+                    ]
+                    result_dict["taxable_income_this"] = income_response_dict[
+                        "taxable_income"
+                    ]
+                    result_dict["model"] = row.get("model.model", self.model)
+                    # save income response in case need to parse later
+                    result_dict["income_response_raw"] = row[f"answer.income_responses"]
 
-                parsed_broad_income = scenario.get("broad_income")
-                parsed_table_income = scenario.get("taxable_income")
+                    parsed_broad_income = income_response_dict["broad_income"]
+                    parsed_table_income = income_response_dict["taxable_income"]
 
-                # Calculate ETI for tax surveys
-                if survey_type == "tax":
+                    # Calculate ETI for tax surveys
                     result_dict["implied_eti_broad"] = self.calculate_eti(
                         scenario["mtr_last"],
                         scenario["mtr_this"],
@@ -255,9 +272,13 @@ How many hours will you work? (0-{labor_endowment})"""
                         scenario["mtr_last"],
                         scenario["mtr_this"],
                         scenario["taxable_income"],
-                        parsed_table_income
+                        parsed_table_income,
                     )
-
+            else:  # lab experiment replication
+                for idx, row in df.iterrows():
+                    result_dict = scenario.copy()
+                    result_dict["labor_supply"] = row.get("answer.labor_supply")
+                    result_dict["model"] = row.get("model.model", self.model)
 
                 all_results.append(result_dict)
 

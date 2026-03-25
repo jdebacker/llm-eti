@@ -11,13 +11,11 @@ from tqdm import tqdm
 
 from .edsl_client import EDSLClient
 
+
 @dataclass
 class SimulationParams:
-    min_rate: float
-    max_rate: float
-    step_size: float
-    responses_per_rate: int
-    taxable_income_ratio: float = 0.75
+    responses_per_household: int
+    test_mode: bool = False
 
 
 class TaxSimulation:
@@ -103,6 +101,7 @@ class TaxSimulation:
                         "implied_eti_taxable": result.get("implied_eti_taxable"),
                         "implied_eti_broad": result.get("implied_eti_broad"),
                         "model": result.get("model", self.client.model),
+                        "income_response_raw": result.get("income_response_raw"),
                     }
                 )
 
@@ -111,7 +110,9 @@ class TaxSimulation:
         except Exception as e:
             import traceback
 
-            print(f"\nError in simulation for income {row['broad_income']}, rate {row['mtr_prime']}:")
+            print(
+                f"\nError in simulation for income {row['broad_income']}, rate {row['mtr_prime']}:"
+            )
             print(f"Error type: {type(e).__name__}")
             print(f"Error message: {str(e)}")
             traceback.print_exc()

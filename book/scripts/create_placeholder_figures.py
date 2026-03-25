@@ -29,10 +29,7 @@ def main():
 
     # Create missing figures
     missing_figures = [
-        (
-            "model_eti_comparison.png",
-            "Model ETI Comparison\n(GPT-4o vs GPT-4o-mini)",
-        ),
+        ("model_eti_comparison.png", "Model ETI Comparison\n(GPT-4o vs GPT-4o-mini)"),
         (
             "response_rate.png",
             "Response Rate by Model\n(Percentage of valid responses)",

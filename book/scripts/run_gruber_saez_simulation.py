@@ -1,9 +1,6 @@
+#!/usr/bin/env python3
 """
-Run Gruber & Saez observational study replication using PolicyEngine inputs.
-
-Reads household-level broad income, taxable income, and marginal tax rates from
-a PolicyEngine-generated CSV, queries the LLM for both taxable and broad income
-responses under the new tax rate, and saves results to book/data/.
+Run Gruber & Saez (2002) observational study replication using EDSL.
 """
 
 import argparse
@@ -11,35 +8,49 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root to path
-sys.path.append(str(Path(__file__).parent.parent.parent))
-
 from llm_eti.edsl_client import EDSLClient
 from llm_eti.simulation_engine import SimulationParams, TaxSimulation
 
+# Add parent directory to path to import from main project
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
+# set constants
 CSV_PATH = (
     Path(__file__).parent.parent.parent
     / "policy_engine_simulation"
     / "policyengine_sample_incomes.csv"
 )
+ALL_MODELS = [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "deepseek-ai/DeepSeek-V3",
+    "claude-3-haiku-20240307",
+]
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run Gruber & Saez simulation from PolicyEngine inputs"
+        description="Run Gruber & Saez simulation with EDSL"
     )
     parser.add_argument(
-        "--test", action="store_true", help="Run in test mode (1 household)"
+        "--test", action="store_true", help="Run in test mode with fewer scenarios"
     )
     parser.add_argument("--model", default="gpt-4o-mini", help="LLM model to use")
     parser.add_argument(
+        "--production", action="store_true", help="Run full production simulation"
+    )
+    parser.add_argument(
         "--responses", type=int, default=1, help="LLM responses per household"
+    )
+    parser.add_argument(
+        "--cache-analysis", action="store_true", help="Analyze cache usage after run"
     )
     args = parser.parse_args()
 
-    api_key = os.getenv("OPENAI_API_KEY")
+    # Check for API key
+    api_key = os.getenv("EXPECTED_PARROT_API_KEY")
     if not api_key:
-        print("Error: OPENAI_API_KEY environment variable not set")
+        print("Error: EXPECTED_PARROT_API_KEY environment variable not set")
         sys.exit(1)
 
     if not CSV_PATH.exists():
@@ -49,26 +60,61 @@ def main():
     print(f"Running Gruber & Saez simulation with {args.model}...")
     print(f"Input CSV: {CSV_PATH}")
 
-    client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
-    params = SimulationParams(
-        responses_per_household=args.responses,
-        test_mode=args.test,
-    )
+    # Initialize client and parameters
+    if args.model == "all":
+        model_list = ALL_MODELS
+        print(f"Running with all models: {model_list}")
+    else:
+        model_list = [args.model]
 
-    simulation = TaxSimulation(client, params)
-    results_df = simulation.run_bulk_simulation(CSV_PATH)
+    for model in model_list:
+        client = EDSLClient(api_key=api_key, model=model, use_cache=True)
+        params = SimulationParams(
+            responses_per_household=args.responses,
+            test_mode=args.test,
+        )
 
-    output_dir = Path(__file__).parent.parent / "data"
-    output_dir.mkdir(exist_ok=True)
+        print("Running simulation with:")
+        print(f"  - Model: {model}")
+        print(f"  - Responses per household: {args.responses}")
+        print(f"  - Cache enabled: {client.use_cache}")
 
-    filename = f"gruber_saez_results_{args.model}"
-    if args.test:
-        filename += "_test"
-    filename += ".csv"
+        # Run simulation
+        simulation = TaxSimulation(client, params)
+        results_df = simulation.run_bulk_simulation(CSV_PATH)
 
-    results_df.to_csv(output_dir / filename, index=False)
-    print(f"Results saved to {output_dir / filename}")
-    print(f"Total responses: {len(results_df)}")
+        # Save results
+        output_dir = Path(__file__).parent.parent / "data"
+        output_dir.mkdir(exist_ok=True)
+
+        # if model string has a slash (e.g. "deepseek-ai/DeepSeek-V3"), replace with underscore for filename
+        safe_model_name = model.replace("/", "_")
+        filename = f"gruber_saez_results_{safe_model_name}"
+        if args.test:
+            filename += "_test"
+
+        results_df.to_csv(output_dir / f"{filename}.csv", index=False)
+        print(f"Results saved to {output_dir / f'{filename}.csv'}")
+        print(f"Total responses: {len(results_df)}")
+        print(f"Cache usage enabled: {client.use_cache}")
+
+    # Analyze cache if requested
+    if args.cache_analysis:
+        from llm_eti.cache_utils import CacheExplorer
+
+        print("\nCache Analysis:")
+        explorer = CacheExplorer()
+        stats = explorer.get_cache_stats()
+
+        if "error" not in stats:
+            print(f"  - Total cache entries: {stats['total_entries']}")
+            print(f"  - Models in cache: {list(stats['models'].keys())}")
+
+            savings = explorer.estimate_cost_savings()
+            if "error" not in savings:
+                print(
+                    f"  - Estimated cost saved: ${savings['estimated_cost_saved']:.4f}"
+                )
 
 
 if __name__ == "__main__":

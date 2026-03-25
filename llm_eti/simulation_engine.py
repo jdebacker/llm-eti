@@ -1,10 +1,11 @@
-"""Simulation engine -- reads inputs from PolicyEngine CSV."""
+"""Simulation engine using EDSL for LLM surveys."""
 
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
@@ -13,12 +14,14 @@ from .edsl_client import EDSLClient
 
 @dataclass
 class SimulationParams:
-    responses_per_household: int = 1
+    responses_per_household: int
     test_mode: bool = False
 
 
 class TaxSimulation:
-    """Tax simulation driven by PolicyEngine CSV inputs."""
+    """Tax simulation using EDSL surveys.  Inputs from PolicyEngine CSV
+    of broad incomes and tax rates, outputs DataFrame with simulated
+    taxable incomes and implied ETI."""
 
     def __init__(self, edsl_client: EDSLClient, params: SimulationParams):
         self.client = edsl_client
@@ -64,23 +67,26 @@ class TaxSimulation:
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        scenario = {
-            "broad_income": row["broad_income"],
-            "taxable_income": row["taxable_income"],
-            "mtr_last": row["mtr"],
-            "mtr_this": row["mtr_prime"],
-        }
-
         try:
+            # Create scenario for EDSL
+            scenario = {
+                "broad_income": row["broad_income"],
+                "taxable_income": row["taxable_income"],
+                "mtr_last": row["mtr"],
+                "mtr_this": row["mtr_prime"],
+            }
+
+            # Run survey with EDSL
             results = self.client.run_batch_surveys(
                 [scenario],
                 n=self.params.responses_per_household,
                 survey_type="tax",
             )
 
-            formatted = []
+            # Format results to match existing structure
+            formatted_results = []
             for i, result in enumerate(results):
-                formatted.append(
+                formatted_results.append(
                     {
                         "timestamp": timestamp,
                         "household_id": row.get("household_id"),
@@ -95,16 +101,20 @@ class TaxSimulation:
                         "implied_eti_taxable": result.get("implied_eti_taxable"),
                         "implied_eti_broad": result.get("implied_eti_broad"),
                         "model": result.get("model", self.client.model),
+                        "income_response_raw": result.get("income_response_raw"),
                     }
                 )
-            return formatted
+
+            return formatted_results
 
         except Exception as e:
             import traceback
 
             print(
-                f"\nError for household {row.get('household_id')}: {type(e).__name__}: {e}"
+                f"\nError in simulation for income {row['broad_income']}, rate {row['mtr_prime']}:"
             )
+            print(f"Error type: {type(e).__name__}")
+            print(f"Error message: {str(e)}")
             traceback.print_exc()
             return []
 
@@ -125,5 +135,106 @@ class TaxSimulation:
                 results = self.run_single_simulation(row.to_dict())
                 all_results.extend(results)
                 pbar.update(1)
+
+        return pd.DataFrame(all_results)
+
+
+# Lab experiment simulation for PKNF replication
+class LabExperimentSimulation:
+    """PKNF lab experiment simulation using EDSL.
+
+    This class replicates the experimental framework of Pfeil, Kasper, Necker & Feld (2024),
+    which measures labor supply responses to changes in tax schedules. The experiment consists of:
+
+    - 16 rounds of decision-making
+    - Tax reform after round 8 (either adding or removing a notch)
+    - Randomized labor endowments (14-30 units per round)
+    - Wage of 20 ECU per unit of labor
+
+    References:
+        Pfeil, K., Kasper, M., Necker, S., & Feld, L. P. (2024).
+        Tax System Design, Tax Reform, and Labor Supply. CESifo Working Paper No. 11350.
+    """
+
+    def __init__(self, edsl_client: EDSLClient):
+        self.client = edsl_client
+        # Import here to avoid circular imports
+        from .config import Config
+
+        self.config = Config.PKNF_CONFIG
+
+    def run_experiment(
+        self,
+        treatments: List[str],
+        rounds: Optional[int] = None,
+        subjects_per_treatment: int = 100,
+    ) -> pd.DataFrame:
+        """Run the full lab experiment simulation.
+
+        Args:
+            treatments: List of treatment labels to run (e.g., ["Prog,Prog", "Prog,Flat25"])
+            rounds: Number of rounds (default: 16 from config)
+            subjects_per_treatment: Number of subjects per treatment group
+
+        Returns:
+            DataFrame with experiment results
+        """
+        from .pknf_types import Treatment
+
+        if rounds is None:
+            rounds = int(self.config["rounds"])
+
+        all_results = []
+
+        for treatment_label in treatments:
+            try:
+                treatment = Treatment.from_label(treatment_label)
+            except ValueError:
+                print(f"Warning: Unknown treatment '{treatment_label}', skipping")
+                continue
+
+            for subject_id in range(subjects_per_treatment):
+                # Random labor endowments for each round
+                labor_endowments = np.random.randint(
+                    int(self.config["labor_endowment_min"]),
+                    int(self.config["labor_endowment_max"]) + 1,
+                    size=rounds,
+                )
+
+                for round_idx in range(rounds):
+                    round_num = round_idx + 1  # 1-based round number
+
+                    # Get tax schedule for this round
+                    schedule = treatment.get_schedule_for_round(round_num)
+
+                    scenario = {
+                        "round_num": round_num,
+                        "tax_schedule": schedule.value,
+                        "labor_endowment": int(labor_endowments[round_idx]),
+                        "wage_per_unit": self.config["wage_per_unit"],
+                    }
+
+                    # Run survey
+                    results = self.client.run_batch_surveys(
+                        [scenario], n=1, survey_type="lab"
+                    )
+
+                    if results:
+                        result = results[0]
+                        labor_supply = result.get("labor_supply_this", 0)
+
+                        all_results.append(
+                            {
+                                "treatment": treatment.label,
+                                "subject_id": subject_id,
+                                "round": round_num,  # Changed from round_num to round
+                                "tax_schedule": schedule.value,
+                                "labor_endowment": labor_endowments[round_idx],
+                                "labor_supply": labor_supply,
+                                "income": labor_supply * self.config["wage_per_unit"],
+                                "post_reform": round_num > self.config["reform_round"],
+                                "model": result.get("model", self.client.model),
+                            }
+                        )
 
         return pd.DataFrame(all_results)

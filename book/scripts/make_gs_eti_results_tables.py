@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-import statsmodels.api as sm
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 INPUT_FILE = DATA_DIR / "gruber_saez_results_gpt-4o-mini.csv"
@@ -23,7 +24,9 @@ print(f"Model: {model_name}")
 # 2. Construct log changes
 # --------------------------------------------------
 df["log_rate_change"] = np.log((1 - df["mtr_prime"]) / (1 - df["mtr"]))
-df["log_taxable_income_change"] = np.log(df["taxable_income_this"] / df["taxable_income"])
+df["log_taxable_income_change"] = np.log(
+    df["taxable_income_this"] / df["taxable_income"]
+)
 df["log_broad_income_change"] = np.log(df["broad_income_this"] / df["broad_income"])
 
 # Drop rows where log change is undefined (zero income or identical pre/post rate)
@@ -33,6 +36,7 @@ taxable_sample = df.replace([np.inf, -np.inf], np.nan).dropna(
 broad_sample = df.replace([np.inf, -np.inf], np.nan).dropna(
     subset=["log_rate_change", "log_broad_income_change"]
 )
+
 
 # --------------------------------------------------
 # 3. Run regressions
@@ -49,12 +53,18 @@ def run_regression(y, X_col, sample, label):
     median_eti = sample[label].median()
 
     def stars(p):
-        if p < 0.01: return "***"
-        elif p < 0.05: return "**"
-        elif p < 0.1: return "*"
-        else: return ""
+        if p < 0.01:
+            return "***"
+        elif p < 0.05:
+            return "**"
+        elif p < 0.1:
+            return "*"
+        else:
+            return ""
 
-    print(f"\n  ETI coefficient: {coef:.4f}{stars(pval)}  (p={pval:.4g}, N={nobs}, R²={r2:.4f})")
+    print(
+        f"\n  ETI coefficient: {coef:.4f}{stars(pval)}  (p={pval:.4g}, N={nobs}, R²={r2:.4f})"
+    )
     print(f"  Mean implied ETI: {mean_eti:.4f} | Median: {median_eti:.4f}")
 
     return {
@@ -65,9 +75,13 @@ def run_regression(y, X_col, sample, label):
         "Median implied ETI": round(median_eti, 4),
     }
 
+
 print("\n[Taxable Income]")
 taxable_results = run_regression(
-    "log_taxable_income_change", "log_rate_change", taxable_sample, "implied_eti_taxable"
+    "log_taxable_income_change",
+    "log_rate_change",
+    taxable_sample,
+    "implied_eti_taxable",
 )
 
 print("\n[Broad Income]")
@@ -86,7 +100,7 @@ results_df = pd.DataFrame(
 )
 
 results_df.to_csv(OUTPUT_FILE)
-print(f"\n--------------------------------------------------")
+print("\n--------------------------------------------------")
 print(f"Results saved to {OUTPUT_FILE.name}")
 print("--------------------------------------------------")
 print(results_df)

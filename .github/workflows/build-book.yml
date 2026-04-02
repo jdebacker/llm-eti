@@ -98,6 +98,7 @@ jobs:
         cd book
         make figures
         make tables
+        make generate-paper
     
     - name: Check for missing images
       run: |

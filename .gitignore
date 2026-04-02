@@ -105,3 +105,6 @@ ipython_config.py
 
 # Results directory (but keep structure)
 results/*/
+
+# Generated survey CSV artifacts
+edsl_output_tax_*.csv

@@ -1,20 +1,9 @@
-"""Paper results module - single source of truth for all values in the paper.
+"""Paper results module - single source of truth for paper fragments.
 
-This module stores all numerical values used in the paper. The paper
-uses MyST's {eval} role to pull values directly from this module,
-making it impossible for paper values to diverge from computed results.
-
-NOTE: Values are intentionally stored here rather than computed at
-build time. This ensures:
-1. Reproducibility - exact values are version-controlled
-2. Speed - no API calls required to build the paper
-3. Auditability - reviewers can inspect exact values used
-
-Usage in paper:
-    Inline: The ETI for GPT-4o is {eval}`r.gpt4o.eti`.
-    Table: ```{code-cell} python
-           r.table_response_dist()
-           ```
+This module stores all numerical values used in the paper and exposes
+helpers that render markdown tables. The book build uses a small
+generation step to write these tables into ``book/generated/`` before
+Jupyter Book renders the markdown chapters.
 """
 
 from dataclasses import dataclass, field
@@ -114,11 +103,11 @@ class PaperResults:
     pknf_results: Dict[str, "PKNFResult"] = field(default_factory=dict, init=False)
     income_results: List["IncomeResult"] = field(default_factory=list, init=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize computed results."""
         self._compute_results()
 
-    def _compute_results(self):
+    def _compute_results(self) -> None:
         """Store results from actual simulations."""
         # Model results from tax response survey
         self.models = {
@@ -221,52 +210,70 @@ class PaperResults:
     # Table generators
     def table_response_dist(self) -> str:
         """Generate response distribution table."""
+        g4o = self.gpt4o
+        g4m = self.gpt4o_mini
+        rows = [
+            ("Much lower", g4o.response_much_lower, g4m.response_much_lower),
+            (
+                "Somewhat lower",
+                g4o.response_somewhat_lower,
+                g4m.response_somewhat_lower,
+            ),
+            ("About same", g4o.response_about_same, g4m.response_about_same),
+            (
+                "Somewhat higher",
+                g4o.response_somewhat_higher,
+                g4m.response_somewhat_higher,
+            ),
+            ("Much higher", g4o.response_much_higher, g4m.response_much_higher),
+        ]
         lines = [
             "| Response | GPT-4o | GPT-4o-mini |",
             "|----------|--------|-------------|",
         ]
-        g4o = self.gpt4o
-        g4m = self.gpt4o_mini
-        lines.append(
-            f"| Much lower | {g4o.response_much_lower}% | {g4m.response_much_lower}% |"
-        )
-        lines.append(
-            f"| Somewhat lower | {g4o.response_somewhat_lower}% | {g4m.response_somewhat_lower}% |"
-        )
-        lines.append(
-            f"| About same | {g4o.response_about_same}% | {g4m.response_about_same}% |"
-        )
-        lines.append(
-            f"| Somewhat higher | {g4o.response_somewhat_higher}% | {g4m.response_somewhat_higher}% |"
-        )
-        lines.append(
-            f"| Much higher | {g4o.response_much_higher}% | {g4m.response_much_higher}% |"
-        )
+        for label, gpt4o_value, gpt4o_mini_value in rows:
+            lines.append(f"| {label} | {gpt4o_value}% | {gpt4o_mini_value}% |")
         return "\n".join(lines)
 
     def table_mean_eti(self) -> str:
         """Generate mean ETI by scenario table."""
+        g4o = self.gpt4o
+        g4m = self.gpt4o_mini
+        rows = [
+            ("All", f"{g4o.eti_mean:.2f}", f"{g4m.eti_mean:.2f}", self.empirical_range),
+            (
+                "Wage workers",
+                f"{g4o.eti_wage_worker:.2f}",
+                f"{g4m.eti_wage_worker:.2f}",
+                self.wage_worker_range,
+            ),
+            (
+                "Self-employed",
+                f"{g4o.eti_self_employed:.2f}",
+                f"{g4m.eti_self_employed:.2f}",
+                self.self_employed_range,
+            ),
+            (
+                "Tax increase",
+                f"{g4o.eti_increase:.2f}",
+                f"{g4m.eti_increase:.2f}",
+                "--",
+            ),
+            (
+                "Tax decrease",
+                f"{g4o.eti_decrease:.2f}",
+                f"{g4m.eti_decrease:.2f}",
+                "--",
+            ),
+        ]
         lines = [
             "| Scenario | GPT-4o | GPT-4o-mini | Empirical Range |",
             "|----------|--------|-------------|-----------------|",
         ]
-        g4o = self.gpt4o
-        g4m = self.gpt4o_mini
-        lines.append(
-            f"| All | {g4o.eti_mean:.2f} | {g4m.eti_mean:.2f} | {self.empirical_range} |"
-        )
-        lines.append(
-            f"| Wage workers | {g4o.eti_wage_worker:.2f} | {g4m.eti_wage_worker:.2f} | {self.wage_worker_range} |"
-        )
-        lines.append(
-            f"| Self-employed | {g4o.eti_self_employed:.2f} | {g4m.eti_self_employed:.2f} | {self.self_employed_range} |"
-        )
-        lines.append(
-            f"| Tax increase | {g4o.eti_increase:.2f} | {g4m.eti_increase:.2f} | -- |"
-        )
-        lines.append(
-            f"| Tax decrease | {g4o.eti_decrease:.2f} | {g4m.eti_decrease:.2f} | -- |"
-        )
+        for scenario, gpt4o_value, gpt4o_mini_value, empirical_range in rows:
+            lines.append(
+                f"| {scenario} | {gpt4o_value} | {gpt4o_mini_value} | {empirical_range} |"
+            )
         return "\n".join(lines)
 
     def table_factorial_design(self) -> str:
@@ -284,7 +291,7 @@ class PaperResults:
             f"| **Rate change** | +{self.rate_change_pp}pp increase, -{self.rate_change_pp}pp decrease |"
         )
         lines.append("| **Persona type** | Wage worker, Self-employed |")
-        lines.append("| **Model** | GPT-4o, GPT-4o-mini, Claude, Gemini |")
+        lines.append("| **Model** | GPT-4o, GPT-4o-mini |")
         return "\n".join(lines)
 
     def table_eti_by_income(self) -> str:

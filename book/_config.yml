@@ -3,6 +3,9 @@ title: "What can LLMs tell us about the ETI?"
 author: Jason DeBacker and Max Ghenis
 copyright: "2025"
 logo: ""
+only_build_toc_files: true
+bibtex_bibfiles:
+  - references.bib
 
 # Force re-execution of notebooks on each build (set to 'cache' to reuse outputs)
 execute:
@@ -28,6 +31,7 @@ latex:
 # Sphinx configuration
 sphinx:
   config:
+    bibtex_reference_style: author_year
     language: en
     mathjax_path: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
     html_js_files:

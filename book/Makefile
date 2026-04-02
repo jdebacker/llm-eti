@@ -28,7 +28,13 @@ all: data figures tables book
 install:
 	@command -v uv >/dev/null 2>&1 || (echo "Installing uv..." && curl -LsSf https://astral.sh/uv/install.sh | sh)
 	@echo "Installing dependencies with uv..."
-	cd .. && $(UV) sync
+	cd .. && $(UV) sync --group dev
+
+# Generate markdown includes for paper tables and metrics
+.PHONY: generate-paper
+generate-paper:
+	@echo "Generating paper markdown includes..."
+	cd .. && $(UV) run python book/$(SCRIPTS_DIR)/generate_paper_includes.py
 
 # Run LLM simulations (expensive - only run when needed)
 .PHONY: data
@@ -62,13 +68,13 @@ tables:
 
 # Build the JupyterBook
 .PHONY: book
-book:
+book: generate-paper
 	@echo "Building JupyterBook..."
 	cd .. && $(UV) run jupyter-book build book
 
 # Build PDF via LaTeX
 .PHONY: pdf
-pdf: book
+pdf: generate-paper
 	@echo "Building PDF..."
 	cd .. && $(UV) run jupyter-book build book --builder pdflatex
 
@@ -118,7 +124,7 @@ lint:
 .PHONY: test
 test:
 	@echo "Running tests..."
-	cd .. && $(UV) run pytest tests/
+	cd .. && $(UV) run python -m pytest tests/
 
 # Help
 .PHONY: help

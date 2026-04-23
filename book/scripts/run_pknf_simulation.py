@@ -14,6 +14,13 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 from llm_eti.edsl_client import EDSLClient
 from llm_eti.simulation_engine import LabExperimentSimulation
 
+ALL_MODELS = [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "deepseek-ai/DeepSeek-V3",
+    "claude-3-haiku-20240307",
+]
+
 
 def main():
     parser = argparse.ArgumentParser(description="Run PKNF simulation with EDSL")
@@ -37,13 +44,15 @@ def main():
 
     # Set parameters based on mode
     if args.test:
-        num_subjects = 10
+        num_subjects = 2
+        rounds = 2
     elif args.production:
         num_subjects = 100
+        rounds = 16
     else:
         # Default mode - medium size
         num_subjects = 50
-
+        rounds = 8
     # All treatments from PKNF
     treatments = [
         "Prog,Prog",
@@ -54,32 +63,42 @@ def main():
     ]
 
     # Initialize client and experiment
-    client = EDSLClient(api_key=api_key, model=args.model, use_cache=True)
-    experiment = LabExperimentSimulation(client)
+    # Initialize client and parameters
+    if args.model == "all":
+        model_list = ALL_MODELS
+        print(f"Running with all models: {model_list}")
+    else:
+        model_list = [args.model]
 
-    print("Running PKNF simulation with:")
-    print(f"  - Model: {args.model}")
-    print(f"  - Subjects per treatment: {num_subjects}")
-    print(f"  - Total treatments: {len(treatments)}")
-    print("  - Total rounds: 16")
-    print(f"  - Cache enabled: {client.use_cache}")
+    for model in model_list:
+        client = EDSLClient(api_key=api_key, model=model, use_cache=True)
+        experiment = LabExperimentSimulation(client)
 
-    # Run experiment
-    results_df = experiment.run_experiment(
-        treatments=treatments, rounds=16, subjects_per_treatment=num_subjects
-    )
+        print("Running PKNF simulation with:")
+        print(f"  - Model: {model}")
+        print(f"  - Subjects per treatment: {num_subjects}")
+        print(f"  - Total treatments: {len(treatments)}")
+        print(f"  - Total rounds: {rounds}")
+        print(f"  - Cache enabled: {client.use_cache}")
 
-    # Save results
-    output_dir = Path(__file__).parent.parent / "data"
-    output_dir.mkdir(exist_ok=True)
+        # Run experiment
+        results_df = experiment.run_experiment(
+            treatments=treatments, rounds=rounds, subjects_per_treatment=num_subjects
+        )
 
-    filename = f"pknf_results_{args.model}"
-    if args.test:
-        filename += "_test"
+        # Save results
+        output_dir = Path(__file__).parent.parent / "data"
+        output_dir.mkdir(exist_ok=True)
 
-    results_df.to_csv(output_dir / f"{filename}.csv", index=False)
-    print(f"Results saved to {output_dir / f'{filename}.csv'}")
-    print(f"Total responses: {len(results_df)}")
+        # if model string has a slash (e.g. "deepseek-ai/DeepSeek-V3"), replace with underscore for filename
+        safe_model_name = model.replace("/", "_")
+        filename = f"pknf_results_{safe_model_name}"
+        if args.test:
+            filename += "_test"
+
+        results_df.to_csv(output_dir / f"{filename}.csv", index=False)
+        print(f"Results saved to {output_dir / f'{filename}.csv'}")
+        print(f"Total responses: {len(results_df)}")
 
     # Analyze cache if requested
     if args.cache_analysis:

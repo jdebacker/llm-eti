@@ -54,13 +54,13 @@ class Treatment(Enum):
                 return treatment
         raise ValueError(f"Unknown treatment label: {label}")
 
-    def get_schedule_for_round(self, round_num: int) -> TaxSchedule:
+    def get_schedule_for_round(self, round_num: int, rounds: int = 16) -> TaxSchedule:
         """Get the tax schedule for a given round (1-based)."""
-        if round_num < 1 or round_num > 16:
-            raise ValueError(f"Round number must be between 1 and 16, got {round_num}")
+        if round_num < 1 or round_num > rounds:
+            raise ValueError(f"Round number must be between 1 and {rounds}, got {round_num}")
 
-        # Rounds 1-8: pre-reform, Rounds 9-16: post-reform
-        if round_num <= 8:
+        # Swith in middle of rounds
+        if round_num <= rounds // 2:
             return self.pre_reform
         else:
             return self.post_reform

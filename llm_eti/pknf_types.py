@@ -59,7 +59,7 @@ class Treatment(Enum):
         if round_num < 1 or round_num > rounds:
             raise ValueError(f"Round number must be between 1 and {rounds}, got {round_num}")
 
-        # Swith in middle of rounds
+        # Switch in middle of rounds
         if round_num <= rounds // 2:
             return self.pre_reform
         else:

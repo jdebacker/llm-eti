@@ -228,12 +228,12 @@ class LabExperimentSimulation:
                             {
                                 "treatment": treatment.label,
                                 "subject_id": subject_id,
-                                "round": round_num,  # Changed from round_num to round
+                                "round": round_num,
                                 "tax_schedule": schedule.value,
                                 "labor_endowment": labor_endowments[round_idx],
                                 "labor_supply": income_choice / self.config["wage_per_unit"],
                                 "income": income_choice,
-                                "post_reform": round_num > self.config["reform_round"],
+                                "post_reform": round_num > rounds // 2,
                                 "model": result.get("model", self.client.model),
                             }
                         )

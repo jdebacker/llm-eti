@@ -1,4 +1,8 @@
-# Replicating an Observational Study
+# Draft: Gruber-Saez Observational Exercise
+
+This chapter is a draft exploratory writeup. It is not part of the published
+book and is kept outside `book/results/` to avoid drifting out of sync with the
+paper narrative.
 
 We replicate the seminal empirical study of {cite}`GruberSaez2002` by simulating taxpayer responses to marginal tax rate changes using LLMs.
 

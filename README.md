@@ -4,18 +4,21 @@ This repository contains code and analysis for the paper "What can LLMs tell us 
 
 ## Overview
 
-We investigate how Large Language Models (LLMs) perceive and simulate behavioral responses to tax policy changes, specifically measuring the Elasticity of Taxable Income (ETI). 
+We investigate how Large Language Models (LLMs) perceive and simulate behavioral responses to tax policy changes, specifically measuring the Elasticity of Taxable Income (ETI).
 
-The study includes:
+The current paper includes:
 
 1. **Lab Experiment Replication**: Replicating Pfeil et al. (2024) using LLMs instead of human subjects
-2. **Observational Study Replication**: Simulating Gruber & Saez (2002) methodology with LLM responses
+2. **Tax Response Survey**: A factorial survey of taxpayer personas and tax shocks
+
+Exploratory writeups that are not part of the published book live outside the book TOC.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Python 3.12 (required for dependency compatibility)
+- Python 3.12
+- [uv](https://github.com/astral-sh/uv)
 - Expected Parrot API key (for EDSL)
 
 ### Installation
@@ -24,7 +27,7 @@ The study includes:
 # Install uv if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Install dependencies (uses Python 3.12 automatically)
+# Install dependencies
 make install
 
 # Set your Expected Parrot API key
@@ -49,7 +52,7 @@ To ensure everyone uses the same environment:
 
 3. **Verify installation**:
    ```bash
-   python --version  # Should show 3.13.x
+   python --version  # Should show 3.12.x inside .venv
    uv --version      # Should show uv version
    ```
 
@@ -62,23 +65,23 @@ make book-test
 
 This will:
 1. Run test simulations using gpt-4o-mini
-2. Generate figures and tables
-3. Build the JupyterBook
+2. Generate figures, tables, and markdown include fragments
+3. Build the Jupyter Book
 4. Serve locally at http://localhost:8000
 
 ## Project Structure
 
 ```
 .
-├── book/                    # JupyterBook paper
+├── book/                    # Published Jupyter Book paper
 │   ├── _config.yml         # Book configuration
-│   ├── intro.md            # Introduction
-│   ├── methods.md          # Methodology
-│   ├── results/            # Analysis chapters
+│   ├── results/            # Published results chapters
+│   ├── drafts/             # Unpublished exploratory chapters
+│   ├── generated/          # Generated markdown fragments
 │   └── scripts/            # Data generation scripts
-├── PKNF_2024_replication/  # Lab experiment code
-├── ETI_simulations/        # Tax simulation engine
-├── results/                # Generated results
+├── llm_eti/                # Python package and analysis code
+├── results/                # Generated simulation outputs
+├── tests/                  # Regression and integration tests
 └── pyproject.toml          # Project dependencies
 ```
 
@@ -96,7 +99,7 @@ cd book
 make all
 ```
 
-## JupyterBook Commands
+## Jupyter Book Commands
 
 - `make book` - Build the JupyterBook
 - `make book-serve` - Serve locally
@@ -128,5 +131,4 @@ cd book && make test
 
 ## License
 
-MIT License - see LICENSE file for details.# Trigger CI
-# Trigger CI
+MIT License - see LICENSE file for details.

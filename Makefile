@@ -1,4 +1,4 @@
-.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint
+.PHONY: install run-simulation clean test-simulation run-simulation-high-income run-simulation-4o run-simple-regression book format lint test
 
 # Use Python 3.12 for compatibility
 # On macOS with Homebrew, use the specific path; otherwise let uv find it
@@ -14,7 +14,7 @@ install:
 	@echo "Creating virtual environment with Python 3.12..."
 	@uv venv --python 3.12
 	@echo "Installing dependencies..."
-	@uv sync
+	@uv sync --group dev
 	@echo ""
 	@echo "✅ Installation complete!"
 	@echo ""
@@ -55,6 +55,9 @@ lint:
 	uv run black --check .
 	uv run ruff check .
 	uv run mypy . --ignore-missing-imports
+
+test:
+	uv run python -m pytest tests/
 
 # Help
 help:

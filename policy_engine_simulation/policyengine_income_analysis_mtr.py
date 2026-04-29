@@ -1,10 +1,11 @@
 # %%
-import h5py
-import pandas as pd
-import numpy as np
 import os
-from policyengine_us import Microsimulation
+
+import h5py
+import numpy as np
+import pandas as pd
 from huggingface_hub import hf_hub_download
+from policyengine_us import Microsimulation
 
 # ── Parameters ─────────────────────────────────────────────────────────────
 S           = 1000  # Total sample size across all years
@@ -62,10 +63,6 @@ for year, filename in YEARS.items():
         .groupby("tax_unit_id")["broad_income"]
         .sum()
     )
-
-    # Print diagnostics on market income level before sampling
-    print(f"Mean market_income: ${broad_tu.mean():,.2f}")
-    print(f"Mean taxable_income: ${pd.Series(taxable_tu).mean():,.2f}")
 
     # Taxable income: PE's TI is already at the tax unit level — use directly
     taxable_tu = baseline.calculate("taxable_income", period=year).values

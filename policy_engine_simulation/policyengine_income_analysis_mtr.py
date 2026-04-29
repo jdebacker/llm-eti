@@ -1,16 +1,13 @@
 # %%
-import os
-
 import h5py
-import numpy as np
 import pandas as pd
-from huggingface_hub import hf_hub_download
+import numpy as np
+import os
 from policyengine_us import Microsimulation
+from huggingface_hub import hf_hub_download
 
-# %%
-
-# Parameters
-S = 1000  # Total sample size across all years
+# ── Parameters ─────────────────────────────────────────────────────────────
+S           = 1000  # Total sample size across all years
 RANDOM_SEED = 42
 
 # Only these two files have the required PolicyEngine-enhanced structure.
@@ -23,51 +20,7 @@ YEARS = {
 
 N_PER_YEAR = S // len(YEARS)  # = S/2 for now
 
-# Income variable definitions
-# (as defined my market income in https://github.com/PolicyEngine/policyengine-us/blob/main/policyengine_us/parameters/gov/household/market_income_sources.yaml)
-
-MARKET_INCOME_VARS = [
-    "employment_income",
-    "self_employment_income",
-    "partnership_s_corp_income",
-    "gi_cash_assistance",
-    "farm_income",
-    "farm_rent_income",
-    "capital_gains",
-    "interest_income",
-    "rental_income",
-    "dividend_income",
-    "pension_income",
-    "debt_relief",
-    "unemployment_compensation",
-    "social_security",
-    "illicit_income",
-    "retirement_distributions",
-    "miscellaneous_income",
-    "ak_permanent_fund_dividend",
-]
-
-TAXABLE_INCOME_VARS = [
-    "employment_income",
-    "self_employment_income",
-    "tip_income",
-    "social_security_retirement",
-    "unemployment_compensation",
-    "taxable_private_pension_income",
-    "taxable_401k_distributions",
-    "taxable_ira_distributions",
-    "long_term_capital_gains",
-    "short_term_capital_gains",
-    "qualified_dividend_income",
-    "non_qualified_dividend_income",
-    "taxable_interest_income",
-    "rental_income",
-    "farm_income",
-    "alimony_income",
-]
-
-# %%
-# 1: Download files
+# ── Step 1: Download files ─────────────────────────────────────────────────
 print("Downloading files")
 file_paths = {}
 for year, filename in YEARS.items():
@@ -77,12 +30,12 @@ for year, filename in YEARS.items():
     )
 
 
-# %%
-# 2: Process each year
+# ── Step 2: Process each year ──────────────────────────────────────────────
 # For each year:
-#   1. Load household and person level data from h5
-#   3. Aggregate income variables to household level
-#   4. Compute MTR using PE function
+#   1. Load tax unit IDs and weights from h5
+#   2. Use PE's market_income (person-level) aggregated to tax unit for broad income
+#   3. Use PE's taxable_income (tax-unit level) directly — no aggregation needed
+#   4. Use PE's marginal_tax_rate (person-level) aggregated to tax unit via max
 #   5. Expand rows by round(household_weight / 10), minimum 1
 #   6. Draw random sample of N_PER_YEAR rows
 
@@ -93,101 +46,100 @@ for year, filename in YEARS.items():
     path = file_paths[year]
 
     with h5py.File(path, "r") as f:
-        keys = list(f.keys())
-        print(sorted(keys))
-
-        household_id = f["household_id"][:]
+        household_id     = f["household_id"][:]
         household_weight = f["household_weight"][:]
-        person_hh_id = f["person_household_id"][:]
+        person_hh_id     = f["person_household_id"][:]
+        person_tu_id     = f["person_tax_unit_id"][:]
+        tax_unit_id      = f["tax_unit_id"][:]
 
-        broad_vars = [v for v in MARKET_INCOME_VARS if v in keys]
-        taxable_vars = [v for v in TAXABLE_INCOME_VARS if v in keys]
-
-        broad_person = sum(f[v][:] for v in broad_vars)
-        taxable_person = sum(f[v][:] for v in taxable_vars)
-
-    # Aggregate Income
-    broad_hh = (
-        pd.DataFrame({"household_id": person_hh_id, "broad_income": broad_person})
-        .groupby("household_id")["broad_income"]
-        .sum()
-    )
-
-    taxable_hh = (
-        pd.DataFrame({"household_id": person_hh_id, "taxable_income": taxable_person})
-        .groupby("household_id")["taxable_income"]
-        .sum()
-    )
-    # Build household DataFrame`
-    df = pd.DataFrame(
-        {"household_id": household_id, "household_weight": household_weight}
-    )
-    df["broad_income"] = df["household_id"].map(broad_hh)
-    df["taxable_income"] = df["household_id"].map(taxable_hh)
-    df["year"] = year
-    df = df[df["household_weight"] > 0].dropna(subset=["household_weight"])
-
-    # Use PE functions to compute personal MTR and then aggregate to HH level
+    # Instantiate simulation once per year
     baseline = Microsimulation(dataset=path)
-    mtr_person = baseline.calculate("marginal_tax_rate", period=year).values
-    person_mtr_df = pd.DataFrame({"household_id": person_hh_id, "mtr": mtr_person})
-    mtr_hh = person_mtr_df.groupby("household_id")["mtr"].max()
-    df["mtr"] = df["household_id"].map(mtr_hh)
-    print(f"  Households: {len(df):,}")
-    print(f"  Mean MTR: {df['mtr'].mean():.3f}")
 
-    # Expand rows by round(weight / 10), minimum 1
-    df["repeat_count"] = df["household_weight"].apply(lambda w: max(round(w / 10), 1))
-    df_expanded = df.loc[df.index.repeat(df["repeat_count"])].drop(
-        columns=["repeat_count"]
+    # Broad income: sum person-level market_income to tax unit
+    market_income_person = baseline.calculate("market_income", period=year).values
+    broad_tu = (
+        pd.DataFrame({"tax_unit_id": person_tu_id, "broad_income": market_income_person})
+        .groupby("tax_unit_id")["broad_income"]
+        .sum()
     )
-    print(f"  Expanded rows: {len(df_expanded):,}")
 
-    # Sample N_PER_YEAR rows
-    df_year_sample = df_expanded.sample(n=N_PER_YEAR, random_state=RANDOM_SEED).copy()
+    # Print diagnostics on market income level before sampling
+    print(f"Mean market_income: ${broad_tu.mean():,.2f}")
+    print(f"Mean taxable_income: ${pd.Series(taxable_tu).mean():,.2f}")
 
+    # Taxable income: PE's TI is already at the tax unit level — use directly
+    taxable_tu = baseline.calculate("taxable_income", period=year).values
+
+    # MTR: PE computes at person level — take max within each tax unit
+    mtr_person = baseline.calculate("marginal_tax_rate", period=year).values
+    mtr_tu = (
+        pd.DataFrame({"tax_unit_id": person_tu_id, "mtr": mtr_person})
+        .groupby("tax_unit_id")["mtr"]
+        .max()
+    )
+
+    # Map household_weight to each tax unit via person bridge
+    hh_weight_map = pd.Series(household_weight, index=household_id)
+    tu_to_hh = (
+        pd.DataFrame({"tax_unit_id": person_tu_id, "household_id": person_hh_id})
+        .drop_duplicates("tax_unit_id")
+        .set_index("tax_unit_id")["household_id"]
+    )
+
+    # Build tax-unit DataFrame
+    df = pd.DataFrame({"tax_unit_id": tax_unit_id})
+    df["household_weight"] = df["tax_unit_id"].map(tu_to_hh).map(hh_weight_map)
+    df["broad_income"]     = df["tax_unit_id"].map(broad_tu)
+    df["taxable_income"]   = taxable_tu
+    df["mtr"]              = df["tax_unit_id"].map(mtr_tu)
+    df["year"]             = year
+    df = df[df["household_weight"] > 0].dropna(subset=["household_weight"])
+    df = df[df["broad_income"] > 0]
+
+    print(f"  Tax units: {len(df):,}")
+    print(f"  Mean broad income:   ${df['broad_income'].mean():,.2f}")
+    print(f"  Mean taxable income: ${df['taxable_income'].mean():,.2f}")
+    print(f"  Mean MTR:             {df['mtr'].mean():.3f}")
+
+    # Sample N_PER_YEAR rows directly using household_weight as probabilities
+    df_year_sample = df.sample(n=N_PER_YEAR, weights="household_weight", replace=True, random_state=RANDOM_SEED).copy()
     print(f"  Sampled: {len(df_year_sample):,}")
 
     all_samples.append(df_year_sample)
 
-# %%
-# 3: Combine all years
+# ── Step 3: Combine all years ──────────────────────────────────────────────
 df_final = pd.concat(all_samples, ignore_index=True)
 
-# Summary statistics
+# ── Step 4: Generate R' (post-reform rate) ────────────────────────────────
+# R' is a small perturbation around R (MTR), representing a hypothetical
+# tax reform. Drawn from N(0, 0.025) and added to MTR.
+np.random.seed(RANDOM_SEED)
+net_of_tax = 1 - df_final["mtr"]
+shock = np.random.lognormal(mean=0, sigma=0.025, size=len(df_final))
+net_of_tax_prime = (net_of_tax * shock).clip(0.01, 1.0)
+df_final["mtr_prime"] = 1 - net_of_tax_prime
+
+# ── Step 5: Summary statistics ─────────────────────────────────────────────
 print(f"\n{'='*45}")
 print(f"  Total sample size:    {len(df_final):,}")
 print(f"  Years covered:        {sorted(df_final['year'].unique())}")
 print(f"{'='*45}")
-
 for yr in sorted(df_final["year"].unique()):
     sub = df_final[df_final["year"] == yr]
     print(f"  {yr} mean broad income:   ${sub['broad_income'].mean():>12,.2f}")
     print(f"  {yr} mean taxable income: ${sub['taxable_income'].mean():>12,.2f}")
     print(f"  {yr} mean MTR:             {sub['mtr'].mean():>12.3f}")
-
+    print(f"  {yr} mean MTR':            {sub['mtr_prime'].mean():>12.3f}")
 print(f"{'='*45}")
 print(f"  Overall mean broad income:   ${df_final['broad_income'].mean():>12,.2f}")
 print(f"  Overall std broad income:    ${df_final['broad_income'].std():>12,.2f}")
 print(f"  Overall mean taxable income: ${df_final['taxable_income'].mean():>12,.2f}")
 print(f"  Overall std taxable income:  ${df_final['taxable_income'].std():>12,.2f}")
 print(f"  Overall mean MTR:             {df_final['mtr'].mean():>12.3f}")
+print(f"  Overall mean MTR':            {df_final['mtr_prime'].mean():>12.3f}")
 print(f"{'='*45}")
 
-# Export
-export_cols = ["year", "household_id", "broad_income", "taxable_income", "mtr"]
-
+# ── Step 6: Export ─────────────────────────────────────────────────────────
+export_cols = ["year", "tax_unit_id", "household_weight", "broad_income", "taxable_income", "mtr", "mtr_prime"]
 df_final[export_cols].to_csv("policyengine_sample_incomes.csv", index=False)
-
 print(f"\nExported to: {os.path.abspath('policyengine_sample_incomes.csv')}")
-
-# Use sample
-df_final = pd.read_csv("policyengine_sample_incomes.csv")
-
-# Perturb mtr by adding random noise
-RANDOM_SEED = 42
-np.random.seed(RANDOM_SEED)
-df_final["mtr_prime"] = df["mtr"] + np.random.normal(0, 0.025, size=len(df))
-
-# Export
-df_final.to_csv("policyengine_sample_incomes.csv", index=False)

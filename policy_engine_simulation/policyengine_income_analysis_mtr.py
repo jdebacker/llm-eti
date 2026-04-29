@@ -8,7 +8,7 @@ from huggingface_hub import hf_hub_download
 from policyengine_us import Microsimulation
 
 # ── Parameters ─────────────────────────────────────────────────────────────
-S           = 1000  # Total sample size across all years
+S = 1000  # Total sample size across all years
 RANDOM_SEED = 42
 
 # Only these two files have the required PolicyEngine-enhanced structure.
@@ -47,11 +47,11 @@ for year, filename in YEARS.items():
     path = file_paths[year]
 
     with h5py.File(path, "r") as f:
-        household_id     = f["household_id"][:]
+        household_id = f["household_id"][:]
         household_weight = f["household_weight"][:]
-        person_hh_id     = f["person_household_id"][:]
-        person_tu_id     = f["person_tax_unit_id"][:]
-        tax_unit_id      = f["tax_unit_id"][:]
+        person_hh_id = f["person_household_id"][:]
+        person_tu_id = f["person_tax_unit_id"][:]
+        tax_unit_id = f["tax_unit_id"][:]
 
     # Instantiate simulation once per year
     baseline = Microsimulation(dataset=path)
@@ -59,7 +59,9 @@ for year, filename in YEARS.items():
     # Broad income: sum person-level market_income to tax unit
     market_income_person = baseline.calculate("market_income", period=year).values
     broad_tu = (
-        pd.DataFrame({"tax_unit_id": person_tu_id, "broad_income": market_income_person})
+        pd.DataFrame(
+            {"tax_unit_id": person_tu_id, "broad_income": market_income_person}
+        )
         .groupby("tax_unit_id")["broad_income"]
         .sum()
     )
@@ -86,10 +88,10 @@ for year, filename in YEARS.items():
     # Build tax-unit DataFrame
     df = pd.DataFrame({"tax_unit_id": tax_unit_id})
     df["household_weight"] = df["tax_unit_id"].map(tu_to_hh).map(hh_weight_map)
-    df["broad_income"]     = df["tax_unit_id"].map(broad_tu)
-    df["taxable_income"]   = taxable_tu
-    df["mtr"]              = df["tax_unit_id"].map(mtr_tu)
-    df["year"]             = year
+    df["broad_income"] = df["tax_unit_id"].map(broad_tu)
+    df["taxable_income"] = taxable_tu
+    df["mtr"] = df["tax_unit_id"].map(mtr_tu)
+    df["year"] = year
     df = df[df["household_weight"] > 0].dropna(subset=["household_weight"])
     df = df[df["broad_income"] > 0]
 
@@ -99,7 +101,9 @@ for year, filename in YEARS.items():
     print(f"  Mean MTR:             {df['mtr'].mean():.3f}")
 
     # Sample N_PER_YEAR rows directly using household_weight as probabilities
-    df_year_sample = df.sample(n=N_PER_YEAR, weights="household_weight", replace=True, random_state=RANDOM_SEED).copy()
+    df_year_sample = df.sample(
+        n=N_PER_YEAR, weights="household_weight", replace=True, random_state=RANDOM_SEED
+    ).copy()
     print(f"  Sampled: {len(df_year_sample):,}")
 
     all_samples.append(df_year_sample)
@@ -137,6 +141,14 @@ print(f"  Overall mean MTR':            {df_final['mtr_prime'].mean():>12.3f}")
 print(f"{'='*45}")
 
 # ── Step 6: Export ─────────────────────────────────────────────────────────
-export_cols = ["year", "tax_unit_id", "household_weight", "broad_income", "taxable_income", "mtr", "mtr_prime"]
+export_cols = [
+    "year",
+    "tax_unit_id",
+    "household_weight",
+    "broad_income",
+    "taxable_income",
+    "mtr",
+    "mtr_prime",
+]
 df_final[export_cols].to_csv("policyengine_sample_incomes.csv", index=False)
 print(f"\nExported to: {os.path.abspath('policyengine_sample_incomes.csv')}")

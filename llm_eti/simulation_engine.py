@@ -237,7 +237,8 @@ class LabExperimentSimulation:
                                 "round": round_num,
                                 "tax_schedule": schedule.value,
                                 "labor_endowment": labor_endowments[round_idx],
-                                "labor_supply": income_choice / self.config["wage_per_unit"],
+                                "labor_supply": income_choice
+                                / self.config["wage_per_unit"],
                                 "income": income_choice,
                                 "post_reform": round_num > rounds // 2,
                                 "model": result.get("model", self.client.model),

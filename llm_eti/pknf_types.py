@@ -57,7 +57,9 @@ class Treatment(Enum):
     def get_schedule_for_round(self, round_num: int, rounds: int = 16) -> TaxSchedule:
         """Get the tax schedule for a given round (1-based)."""
         if round_num < 1 or round_num > rounds:
-            raise ValueError(f"Round number must be between 1 and {rounds}, got {round_num}")
+            raise ValueError(
+                f"Round number must be between 1 and {rounds}, got {round_num}"
+            )
 
         # Switch in middle of rounds
         if round_num <= rounds // 2:

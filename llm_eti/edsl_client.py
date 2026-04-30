@@ -109,6 +109,60 @@ TAXABLE_INCOME: <number>"""
 
         return Survey(questions=[q])
 
+    def create_instructions_text(self, rounds: int, wage_per_unit: int = 20) -> str:
+        """Create static instructions text for the lab experiment.
+
+        Suitable for use as an Agent instruction (system prompt) so the game
+        rules are sent once per API call rather than repeated in every question
+        prompt. The round-specific income cap is omitted here because it is
+        already included in each question via create_lab_experiment_survey.
+
+        Args:
+            rounds: Number of rounds in the experiment
+            wage_per_unit: Wage per unit of labor (default: 20)
+
+        Returns:
+            Instructions text string
+        """
+        return (
+            "You will now participate in a decision-making experiment on "
+            + "behavior towards taxation. This experiment has a decision and "
+            + "a working stage: \n"
+            + f"The decision stage consists of {rounds} rounds. In each round you "
+            + "will choose how much income you want to earn. The income "
+            + "determines the number of tasks you have to complete later. "
+            + "The task is to transcribe words. \n"
+            + " You will have to pay taxes on your income. The tax rate "
+            + "may, but does not have to, vary from round to round. Each of "
+            + f"the {rounds} rounds is independent of each other. \n"
+            + "In each round, you are first informed of the tax rate in this "
+            + "round and the income that you can earn. The higher the income "
+            + "you choose, the more tasks you will have to complete. The lower "
+            + f"the income, the earlier you can finish the experiment. "
+            + f"{wage_per_unit} cents correspond to 1 task. \n"
+            + "After you have entered an income, the number of tasks and the "
+            + "due tax payment will be automatically calculated and shown on "
+            + "the screen. The tax payment equals the chosen income "
+            + "multiplied by the tax rate. After each round, you will "
+            + "receive information about your payoff. Your payoff is the "
+            + "chosen income minus the tax payment. \n"
+            + "In the working stage, you will have to complete the number "
+            + "of tasks to earn the income that you indicated in one of "
+            + f"the previous {rounds} rounds. This round will be randomly selected. "
+            + "It also determines how much your additional earnings from the "
+            + "experiment will be. \n"
+            # + "On the following screen, we will explain the working stage in "
+            # + "more detail. \n"
+            # + f"After the {rounds} rounds in the decision stage, you will have to "
+            # + "work on the income you chose in one randomly selected round. \n"
+            # + "Your task is to transcribe text sequences. Each text "
+            # + "sequence consists of 10 letters, see the example below. "
+            # + "The number of tasks that you will work on depends on your "
+            # + f"decisions in the {rounds} rounds and on chance. A sequence is "
+            # + "counted when you correctly typed in every letter. \n"
+            # + "Text sequence: acyrgxrcqm \n"
+        )
+
     def create_lab_experiment_survey(
         self,
         round_num: int,
@@ -154,46 +208,6 @@ TAXABLE_INCOME: <number>"""
             rate2 = 50
         bkt1 = 400
 
-        # Instruction text  #NOTE: would like to just do this once and not with each round
-        instructions_text = (
-            f"You will now participate in a decision-making experiment on "
-            + "behavior towards taxation. This experiment has a decision and "
-            + "a working stage: \n"
-            + f"The decision stage consists of {rounds} rounds. In each round you "
-            + "will choose how much income you want to earn. The income "
-            + "determines the number of tasks you have to complete later. "
-            + "The task is to transcribe words. \n"
-            + " You will have to pay taxes on your income. The tax rate "
-            + "may, but does not have to, vary from round to round. Each of "
-            + f"the {rounds} rounds is independent of each other. \n"
-            + "In each round, you are first informed of the tax rate in this "
-            + "round and the income that you can earn. The income can be up "
-            + f"to {labor_endowment * wage_per_unit} cents. The higher the income you choose, the more "
-            + "tasks you will have to complete. The lower the income, the "
-            + f"earlier you can finish the experiment. {wage_per_unit} cents correspond to "
-            + "1 task. \n"
-            + "After you have entered an income, the number of tasks and the "
-            + "due tax payment will be automatically calculated and shown on "
-            + "the screen. The tax payment equals the chosen income "
-            + "multiplied by the tax rate. After each round, you will "
-            + "receive information about your payoff. Your payoff is the "
-            + "chosen income minus the tax payment. \n"
-            + "In the working stage, you will have to complete the number "
-            + "of tasks to earn the income that you indicated in one of "
-            + f"the previous {rounds} rounds. This round will be randomly selected. "
-            + "It also determines how much your additional earnings from the "
-            + "experiment will be. \n"
-            + "On the following screen, we will explain the working stage in "
-            + "more detail. \n"  # New screen below
-            + f"After the {rounds} rounds in the decision stage, you will have to "
-            + "work on the income you chose in one randomly selected round. \n"
-            + "Your task is to transcribe text sequences. Each text "
-            + "sequence consists of 10 letters, see the example below. "
-            + "The number of tasks that you will work on depends on your "
-            + f"decisions in the {rounds} rounds and on chance. A sequence is "
-            + "counted when you correctly typed in every letter."
-        )
-
         # Create base prompt with simpler language
         if tax_schedule != "progressive":
             tax_text = (
@@ -220,8 +234,7 @@ TAXABLE_INCOME: <number>"""
                 + " cents."
             )
         prompt = (
-            instructions_text + "\n"
-            + f"Round {round_num} of {rounds} \n"
+            f"Round {round_num} of {rounds} \n"
             + tax_text
             + "\n"
             + f"You can earn an income of {labor_endowment * wage_per_unit:.0f}"
@@ -268,7 +281,11 @@ TAXABLE_INCOME: <number>"""
         return results
 
     def run_batch_surveys(
-        self, scenarios: List[Dict[str, Any]], n: int = 1, survey_type: str = "tax"
+        self,
+        scenarios: List[Dict[str, Any]],
+        n: int = 1,
+        survey_type: str = "tax",
+        agent_instruction: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Run multiple survey scenarios.
 
@@ -289,7 +306,10 @@ TAXABLE_INCOME: <number>"""
                 survey = self.create_lab_experiment_survey(**scenario)
 
             # Create multiple agents for batch processing
-            agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
+            agents = [
+                Agent(name=f"Respondent_{i+1}", instruction=agent_instruction)
+                for i in range(n)
+            ]
 
             # Handle model creation with service names
             if self.model.startswith("gemini-"):

@@ -184,6 +184,9 @@ class LabExperimentSimulation:
         if rounds is None:
             rounds = int(self.config["rounds"])
 
+        instructions = self.client.create_instructions_text(
+            rounds=rounds, wage_per_unit=self.config["wage_per_unit"]
+        )
         all_results = []
 
         for treatment_label in treatments:
@@ -217,7 +220,10 @@ class LabExperimentSimulation:
 
                     # Run survey
                     results = self.client.run_batch_surveys(
-                        [scenario], n=1, survey_type="lab"
+                        [scenario],
+                        n=1,
+                        survey_type="lab",
+                        agent_instruction=instructions,
                     )
 
                     if results:

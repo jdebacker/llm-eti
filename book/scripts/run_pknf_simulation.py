@@ -18,7 +18,7 @@ ALL_MODELS = [
     "gpt-4o-mini",
     "gpt-4o",
     "deepseek-ai/DeepSeek-V3",
-    "claude-3-haiku-20240307",
+    "claude-haiku-4-5-20251001",
 ]
 
 

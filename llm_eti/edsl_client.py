@@ -109,12 +109,67 @@ TAXABLE_INCOME: <number>"""
 
         return Survey(questions=[q])
 
+    def create_instructions_text(self, rounds: int, wage_per_unit: float = 20) -> str:
+        """Create static instructions text for the lab experiment.
+
+        Suitable for use as an Agent instruction (system prompt) so the game
+        rules are sent once per API call rather than repeated in every question
+        prompt. The round-specific income cap is omitted here because it is
+        already included in each question via create_lab_experiment_survey.
+
+        Args:
+            rounds: Number of rounds in the experiment
+            wage_per_unit: Wage per unit of labor (default: 20)
+
+        Returns:
+            Instructions text string
+        """
+        return (
+            "You will now participate in a decision-making experiment on "
+            + "behavior towards taxation. This experiment has a decision and "
+            + "a working stage: \n"
+            + f"The decision stage consists of {rounds} rounds. In each round you "
+            + "will choose how much income you want to earn. The income "
+            + "determines the number of tasks you have to complete later. "
+            + "The task is to transcribe words. \n"
+            + " You will have to pay taxes on your income. The tax rate "
+            + "may, but does not have to, vary from round to round. Each of "
+            + f"the {rounds} rounds is independent of each other. \n"
+            + "In each round, you are first informed of the tax rate in this "
+            + "round and the income that you can earn. The higher the income "
+            + "you choose, the more tasks you will have to complete. The lower "
+            + "the income, the earlier you can finish the experiment. "
+            + f"{wage_per_unit} cents correspond to 1 task. \n"
+            + "After you have entered an income, the number of tasks and the "
+            + "due tax payment will be automatically calculated and shown on "
+            + "the screen. The tax payment equals the chosen income "
+            + "multiplied by the tax rate. After each round, you will "
+            + "receive information about your payoff. Your payoff is the "
+            + "chosen income minus the tax payment. \n"
+            + "In the working stage, you will have to complete the number "
+            + "of tasks to earn the income that you indicated in one of "
+            + f"the previous {rounds} rounds. This round will be randomly selected. "
+            + "It also determines how much your additional earnings from the "
+            + "experiment will be. \n"
+            # + "On the following screen, we will explain the working stage in "
+            # + "more detail. \n"
+            # + f"After the {rounds} rounds in the decision stage, you will have to "
+            # + "work on the income you chose in one randomly selected round. \n"
+            # + "Your task is to transcribe text sequences. Each text "
+            # + "sequence consists of 10 letters, see the example below. "
+            # + "The number of tasks that you will work on depends on your "
+            # + f"decisions in the {rounds} rounds and on chance. A sequence is "
+            # + "counted when you correctly typed in every letter. \n"
+            # + "Text sequence: acyrgxrcqm \n"
+        )
+
     def create_lab_experiment_survey(
         self,
         round_num: int,
         tax_schedule: str,
         labor_endowment: int,
-        wage_per_unit: int = 20,
+        wage_per_unit: float = 20,
+        rounds: int = 16,
     ) -> "Survey":
         """Create survey for PKNF lab experiment replication.
 
@@ -123,47 +178,78 @@ TAXABLE_INCOME: <number>"""
             tax_schedule: Tax schedule type ("flat25", "flat50", "progressive")
             labor_endowment: Maximum labor units available
             wage_per_unit: Wage per unit of labor (default: 20)
+            rounds: Number of rounds (default: 16)
 
         Returns:
             EDSL Survey object
         """
         # Try to use enum for better descriptions
-        try:
-            from llm_eti.pknf_types import TaxSchedule
+        # try:
+        #     from llm_eti.pknf_types import TaxSchedule
 
-            schedule_enum = TaxSchedule(tax_schedule)
-            tax_desc = schedule_enum.description
-        except (ImportError, ValueError):
-            # Fallback to original logic
-            if tax_schedule == "flat25":
-                tax_desc = "a flat tax rate of 25%"
-            elif tax_schedule == "flat50":
-                tax_desc = "a flat tax rate of 50%"
-            else:  # progressive
-                tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
+        #     schedule_enum = TaxSchedule(tax_schedule)
+        #     tax_schedule = schedule_enum.value
+        #     tax_desc = schedule_enum.description
+        # except (ImportError, ValueError):
+        #     # Fallback to original logic
+        #     if tax_schedule == "flat25":
+        #         tax_desc = "a flat tax rate of 25%"
+        #     elif tax_schedule == "flat50":
+        #         tax_desc = "a flat tax rate of 50%"
+        #     else:  # progressive
+        #         tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
+
+        if tax_schedule == "flat25":
+            rate1 = 25
+        elif tax_schedule == "flat50":
+            rate1 = 50
+        else:  # progressive
+            rate1 = 25
+            rate2 = 50
+        bkt1 = 400
 
         # Create base prompt with simpler language
-        prompt = f"""You can work up to {labor_endowment} hours (Round {round_num}).
-Each hour pays ${wage_per_unit}.
-
-Tax system: {tax_desc}"""
-
-        # Add note only for progressive tax
-        if tax_schedule == "progressive":
-            prompt += """
-
-Example: Working 20 hours earns $400, taxed at 25% = $100 tax, keeping $300.
-Working 21 hours earns $420, but tax = $110, keeping only $310."""
-
-        prompt += f"""
-
-How many hours will you work? (0-{labor_endowment})"""
+        if tax_schedule != "progressive":
+            tax_text = (
+                "In this round, the tax rate is "
+                + f"{rate1}"
+                + "% for all incomes. For example, for an income of "
+                + f"{bkt1 + 20} cents, your tax payment will be "
+                + f"{(rate1 / 100) * 420:.0f}"
+                + " cents."
+            )
+        else:
+            tax_text = (
+                "In this round, the tax rate is "
+                + f"{rate1}"
+                + "% for incomes equal to or below "
+                + f"{bkt1}"
+                + " cents.  The tax rate is "
+                + f"{rate2}"
+                + "% on the entire income if income exceeds "
+                + f"{bkt1}"
+                + f" cents. For example, for an income of {bkt1 + 20} "
+                + " cents, your tax payment will be "
+                + f"{(rate2 / 100) * (bkt1 + 20):.0f}"
+                + " cents."
+            )
+        prompt = (
+            f"Round {round_num} of {rounds} \n"
+            + tax_text
+            + "\n"
+            + f"You can earn an income of {labor_endowment * wage_per_unit:.0f}"
+            + " cents. \n"
+            + "Please indicate whether you want to work for "
+            + f"{labor_endowment * wage_per_unit:.0f} cents or another income: \n"
+            # + "Number of text sequences for this chosen income: "
+            # + {chosen_labor} + "\n"  NOTE: This is in original instructions, but not sure how work with LLM
+        )
 
         question = QuestionNumerical(
-            question_name="labor_supply",
+            question_name="income_response",
             question_text=prompt,
             min_value=0,
-            max_value=labor_endowment,
+            max_value=labor_endowment * wage_per_unit,
         )
 
         return Survey([question])
@@ -195,7 +281,11 @@ How many hours will you work? (0-{labor_endowment})"""
         return results
 
     def run_batch_surveys(
-        self, scenarios: List[Dict[str, Any]], n: int = 1, survey_type: str = "tax"
+        self,
+        scenarios: List[Dict[str, Any]],
+        n: int = 1,
+        survey_type: str = "tax",
+        agent_instruction: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Run multiple survey scenarios.
 
@@ -216,7 +306,10 @@ How many hours will you work? (0-{labor_endowment})"""
                 survey = self.create_lab_experiment_survey(**scenario)
 
             # Create multiple agents for batch processing
-            agents = [Agent(name=f"Respondent_{i+1}") for i in range(n)]
+            agents = [
+                Agent(name=f"Respondent_{i+1}", instruction=agent_instruction)
+                for i in range(n)
+            ]
 
             # Handle model creation with service names
             if self.model.startswith("gemini-"):
@@ -230,10 +323,16 @@ How many hours will you work? (0-{labor_endowment})"""
 
             # Extract results to DataFrame
             df = results.to_pandas()
-            df.to_csv(
-                f"edsl_output_{survey_type}_{scenario.get('mtr_this', 'round' + str(scenario.get('round_num', 'unknown')))}.csv",
-                index=False,
-            )
+            if survey_type == "tax":
+                df.to_csv(
+                    f"edsl_output_{survey_type}_{scenario.get('mtr_this', 'round' + str(scenario.get('round_num', 'unknown')))}.csv",
+                    index=False,
+                )
+            else:
+                df.to_csv(
+                    f"edsl_output_{survey_type}_round{scenario.get('round_num', 'unknown')}.csv",
+                    index=False,
+                )
 
             # Process each response
             if survey_type == "tax":
@@ -277,7 +376,9 @@ How many hours will you work? (0-{labor_endowment})"""
             else:  # lab experiment replication
                 for idx, row in df.iterrows():
                     result_dict = scenario.copy()
-                    result_dict["labor_supply"] = row.get("answer.labor_supply")
+                    result_dict["income"] = row.get("answer.income_response")
+                    # save income response in case need to parse later
+                    result_dict["response_raw"] = row["answer.income_response"]
                     result_dict["model"] = row.get("model.model", self.model)
 
                 all_results.append(result_dict)

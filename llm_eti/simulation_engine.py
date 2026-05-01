@@ -184,6 +184,9 @@ class LabExperimentSimulation:
         if rounds is None:
             rounds = int(self.config["rounds"])
 
+        instructions = self.client.create_instructions_text(
+            rounds=rounds, wage_per_unit=self.config["wage_per_unit"]
+        )
         all_results = []
 
         for treatment_label in treatments:
@@ -205,34 +208,39 @@ class LabExperimentSimulation:
                     round_num = round_idx + 1  # 1-based round number
 
                     # Get tax schedule for this round
-                    schedule = treatment.get_schedule_for_round(round_num)
+                    schedule = treatment.get_schedule_for_round(round_num, rounds)
 
                     scenario = {
                         "round_num": round_num,
                         "tax_schedule": schedule.value,
                         "labor_endowment": int(labor_endowments[round_idx]),
                         "wage_per_unit": self.config["wage_per_unit"],
+                        "rounds": rounds,
                     }
 
                     # Run survey
                     results = self.client.run_batch_surveys(
-                        [scenario], n=1, survey_type="lab"
+                        [scenario],
+                        n=1,
+                        survey_type="lab",
+                        agent_instruction=instructions,
                     )
 
                     if results:
                         result = results[0]
-                        labor_supply = result.get("labor_supply_this", 0)
+                        income_choice = result.get("income", 0)
 
                         all_results.append(
                             {
                                 "treatment": treatment.label,
                                 "subject_id": subject_id,
-                                "round": round_num,  # Changed from round_num to round
+                                "round": round_num,
                                 "tax_schedule": schedule.value,
                                 "labor_endowment": labor_endowments[round_idx],
-                                "labor_supply": labor_supply,
-                                "income": labor_supply * self.config["wage_per_unit"],
-                                "post_reform": round_num > self.config["reform_round"],
+                                "labor_supply": income_choice
+                                / self.config["wage_per_unit"],
+                                "income": income_choice,
+                                "post_reform": round_num > rounds // 2,
                                 "model": result.get("model", self.client.model),
                             }
                         )

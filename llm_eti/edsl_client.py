@@ -109,7 +109,7 @@ TAXABLE_INCOME: <number>"""
 
         return Survey(questions=[q])
 
-    def create_instructions_text(self, rounds: int, wage_per_unit: int = 20) -> str:
+    def create_instructions_text(self, rounds: int, wage_per_unit: float = 20) -> str:
         """Create static instructions text for the lab experiment.
 
         Suitable for use as an Agent instruction (system prompt) so the game
@@ -168,7 +168,7 @@ TAXABLE_INCOME: <number>"""
         round_num: int,
         tax_schedule: str,
         labor_endowment: int,
-        wage_per_unit: int = 20,
+        wage_per_unit: float = 20,
         rounds: int = 16,
     ) -> "Survey":
         """Create survey for PKNF lab experiment replication.

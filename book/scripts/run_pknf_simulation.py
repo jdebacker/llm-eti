@@ -34,6 +34,18 @@ def main():
     parser.add_argument(
         "--cache-analysis", action="store_true", help="Analyze cache usage after run"
     )
+    parser.add_argument(
+        "--low-rate",
+        type=float,
+        default=25.0,
+        help="Low marginal tax rate as a percentage (default: 25)",
+    )
+    parser.add_argument(
+        "--high-rate",
+        type=float,
+        default=50.0,
+        help="High marginal tax rate as a percentage (default: 50)",
+    )
     args = parser.parse_args()
 
     # Check for API key
@@ -80,10 +92,16 @@ def main():
         print(f"  - Total treatments: {len(treatments)}")
         print(f"  - Total rounds: {rounds}")
         print(f"  - Cache enabled: {client.use_cache}")
+        print(f"  - Low rate: {args.low_rate}%")
+        print(f"  - High rate: {args.high_rate}%")
 
         # Run experiment
         results_df = experiment.run_experiment(
-            treatments=treatments, rounds=rounds, subjects_per_treatment=num_subjects
+            treatments=treatments,
+            rounds=rounds,
+            subjects_per_treatment=num_subjects,
+            low_rate=args.low_rate,
+            high_rate=args.high_rate,
         )
 
         # Save results
@@ -92,7 +110,9 @@ def main():
 
         # if model string has a slash (e.g. "deepseek-ai/DeepSeek-V3"), replace with underscore for filename
         safe_model_name = model.replace("/", "_")
-        filename = f"pknf_results_{safe_model_name}"
+        low_rate_int = int(args.low_rate)
+        high_rate_int = int(args.high_rate)
+        filename = f"pknf_results_{safe_model_name}_{low_rate_int}pct_{high_rate_int}pct"
         if args.test:
             filename += "_test"
 

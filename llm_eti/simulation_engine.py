@@ -168,6 +168,8 @@ class LabExperimentSimulation:
         treatments: List[str],
         rounds: Optional[int] = None,
         subjects_per_treatment: int = 100,
+        low_rate: float = 25.0,
+        high_rate: float = 50.0,
     ) -> pd.DataFrame:
         """Run the full lab experiment simulation.
 
@@ -175,6 +177,8 @@ class LabExperimentSimulation:
             treatments: List of treatment labels to run (e.g., ["Prog,Prog", "Prog,Flat25"])
             rounds: Number of rounds (default: 16 from config)
             subjects_per_treatment: Number of subjects per treatment group
+            low_rate: Low marginal tax rate as a percentage (default: 25)
+            high_rate: High marginal tax rate as a percentage (default: 50)
 
         Returns:
             DataFrame with experiment results
@@ -216,6 +220,8 @@ class LabExperimentSimulation:
                         "labor_endowment": int(labor_endowments[round_idx]),
                         "wage_per_unit": self.config["wage_per_unit"],
                         "rounds": rounds,
+                        "low_rate": low_rate,
+                        "high_rate": high_rate,
                     }
 
                     # Run survey
@@ -230,9 +236,14 @@ class LabExperimentSimulation:
                         result = results[0]
                         income_choice = result.get("income", 0)
 
+                        # Relabel treatment to reflect actual rates used
+                        output_label = treatment.label.replace(
+                            "Flat25", f"Flat{int(low_rate)}"
+                        ).replace("Flat50", f"Flat{int(high_rate)}")
+
                         all_results.append(
                             {
-                                "treatment": treatment.label,
+                                "treatment": output_label,
                                 "subject_id": subject_id,
                                 "round": round_num,
                                 "tax_schedule": schedule.value,

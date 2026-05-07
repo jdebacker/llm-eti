@@ -112,7 +112,9 @@ def main():
         safe_model_name = model.replace("/", "_")
         low_rate_int = int(args.low_rate)
         high_rate_int = int(args.high_rate)
-        filename = f"pknf_results_{safe_model_name}_{low_rate_int}pct_{high_rate_int}pct"
+        filename = (
+            f"pknf_results_{safe_model_name}_{low_rate_int}pct_{high_rate_int}pct"
+        )
         if args.test:
             filename += "_test"
 

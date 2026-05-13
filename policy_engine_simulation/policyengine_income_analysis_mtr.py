@@ -94,6 +94,7 @@ for year, filename in YEARS.items():
     df["year"] = year
     df = df[df["household_weight"] > 0].dropna(subset=["household_weight"])
     df = df[df["broad_income"] > 0]
+    df = df[df["taxable_income"] > 0]
 
     print(f"  Tax units: {len(df):,}")
     print(f"  Mean broad income:   ${df['broad_income'].mean():,.2f}")

@@ -120,6 +120,7 @@ net_of_tax = 1 - df_final["mtr"]
 shock = np.random.lognormal(mean=0, sigma=0.025, size=len(df_final))
 net_of_tax_prime = (net_of_tax * shock).clip(0.01, 1.0)
 df_final["mtr_prime"] = 1 - net_of_tax_prime
+df_final = df_final[df_final["mtr"] != df_final["mtr_prime"]]
 
 # ── Step 5: Summary statistics ─────────────────────────────────────────────
 print(f"\n{'='*45}")

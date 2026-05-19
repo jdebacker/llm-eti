@@ -89,7 +89,7 @@ class TaxSimulation:
                 formatted_results.append(
                     {
                         "timestamp": timestamp,
-                        "household_id": row.get("household_id"),
+                        "tax_unit_id": row.get("tax_unit_id"),
                         "filing_status": row.get("filing_status"),
                         "broad_income": row["broad_income"],
                         "taxable_income": row["taxable_income"],

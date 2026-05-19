@@ -170,6 +170,8 @@ TAXABLE_INCOME: <number>"""
         labor_endowment: int,
         wage_per_unit: float = 20,
         rounds: int = 16,
+        low_rate: float = 25,
+        high_rate: float = 50,
     ) -> "Survey":
         """Create survey for PKNF lab experiment replication.
 
@@ -179,6 +181,8 @@ TAXABLE_INCOME: <number>"""
             labor_endowment: Maximum labor units available
             wage_per_unit: Wage per unit of labor (default: 20)
             rounds: Number of rounds (default: 16)
+            low_rate: Low marginal tax rate as a percentage (default: 25)
+            high_rate: High marginal tax rate as a percentage (default: 50)
 
         Returns:
             EDSL Survey object
@@ -200,12 +204,12 @@ TAXABLE_INCOME: <number>"""
         #         tax_desc = "a progressive tax where income up to 400 is taxed at 25%, and income above 400 is taxed at 50%"
 
         if tax_schedule == "flat25":
-            rate1 = 25
+            rate1 = low_rate
         elif tax_schedule == "flat50":
-            rate1 = 50
+            rate1 = high_rate
         else:  # progressive
-            rate1 = 25
-            rate2 = 50
+            rate1 = low_rate
+            rate2 = high_rate
         bkt1 = 400
 
         # Create base prompt with simpler language

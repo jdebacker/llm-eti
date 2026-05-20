@@ -89,7 +89,9 @@ for year, filename in YEARS.items():
         pd.DataFrame({"tax_unit_id": person_tu_id, "household_id": person_hh_id})
         .drop_duplicates("tax_unit_id")
         .merge(
-            pd.DataFrame({"household_id": household_id, "household_weight": household_weight}),
+            pd.DataFrame(
+                {"household_id": household_id, "household_weight": household_weight}
+            ),
             on="household_id",
         )[["tax_unit_id", "household_weight"]]
     )
@@ -98,7 +100,9 @@ for year, filename in YEARS.items():
     df = (
         pd.DataFrame({"tax_unit_id": tax_unit_id, "taxable_income": taxable_tu})
         .merge(tu_weight, on="tax_unit_id", how="left")
-        .merge(broad_tu.rename("broad_income").reset_index(), on="tax_unit_id", how="left")
+        .merge(
+            broad_tu.rename("broad_income").reset_index(), on="tax_unit_id", how="left"
+        )
         .merge(mtr_tu.rename("mtr").reset_index(), on="tax_unit_id", how="left")
     )
     df["year"] = year

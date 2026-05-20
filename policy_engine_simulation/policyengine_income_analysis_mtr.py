@@ -19,7 +19,7 @@ YEARS = {
     2024: "cps_2024.h5",
 }
 
-N_PER_YEAR = S // len(YEARS)  # = S/2 for now
+N_PER_YEAR = int(S * 1.1) // len(YEARS)  # oversample to allow mtr_prime range trimming
 
 # ── Step 1: Download files ─────────────────────────────────────────────────
 print("Downloading files")
@@ -36,7 +36,7 @@ for year, filename in YEARS.items():
 #   1. Load tax unit IDs and weights from h5
 #   2. Use PE's market_income (person-level) aggregated to tax unit for broad income
 #   3. Use PE's taxable_income (tax-unit level) directly — no aggregation needed
-#   4. Use PE's marginal_tax_rate (person-level) aggregated to tax unit via max
+#   4. Use PE's marginal_tax_rate (person-level) for highest earner per tax unit
 #   5. Expand rows by round(household_weight / 10), minimum 1
 #   6. Draw random sample of N_PER_YEAR rows
 
@@ -69,28 +69,38 @@ for year, filename in YEARS.items():
     # Taxable income: PE's TI is already at the tax unit level — use directly
     taxable_tu = baseline.calculate("taxable_income", period=year).values
 
-    # MTR: PE computes at person level — take max within each tax unit
+    # MTR: PE computes at person level — take MTR of highest earner per tax unit
     mtr_person = baseline.calculate("marginal_tax_rate", period=year).values
     mtr_tu = (
-        pd.DataFrame({"tax_unit_id": person_tu_id, "mtr": mtr_person})
-        .groupby("tax_unit_id")["mtr"]
-        .max()
+        pd.DataFrame(
+            {
+                "tax_unit_id": person_tu_id,
+                "market_income": market_income_person,
+                "mtr": mtr_person,
+            }
+        )
+        .sort_values("market_income", ascending=False)
+        .drop_duplicates("tax_unit_id")
+        .set_index("tax_unit_id")["mtr"]
     )
 
-    # Map household_weight to each tax unit via person bridge
-    hh_weight_map = pd.Series(household_weight, index=household_id)
-    tu_to_hh = (
+    # Build tax-unit bridge: tax_unit_id -> household_weight
+    tu_weight = (
         pd.DataFrame({"tax_unit_id": person_tu_id, "household_id": person_hh_id})
         .drop_duplicates("tax_unit_id")
-        .set_index("tax_unit_id")["household_id"]
+        .merge(
+            pd.DataFrame({"household_id": household_id, "household_weight": household_weight}),
+            on="household_id",
+        )[["tax_unit_id", "household_weight"]]
     )
 
-    # Build tax-unit DataFrame
-    df = pd.DataFrame({"tax_unit_id": tax_unit_id})
-    df["household_weight"] = df["tax_unit_id"].map(tu_to_hh).map(hh_weight_map)
-    df["broad_income"] = df["tax_unit_id"].map(broad_tu)
-    df["taxable_income"] = taxable_tu
-    df["mtr"] = df["tax_unit_id"].map(mtr_tu)
+    # Build tax-unit DataFrame via merges on tax_unit_id
+    df = (
+        pd.DataFrame({"tax_unit_id": tax_unit_id, "taxable_income": taxable_tu})
+        .merge(tu_weight, on="tax_unit_id", how="left")
+        .merge(broad_tu.rename("broad_income").reset_index(), on="tax_unit_id", how="left")
+        .merge(mtr_tu.rename("mtr").reset_index(), on="tax_unit_id", how="left")
+    )
     df["year"] = year
     df = df[df["household_weight"] > 0].dropna(subset=["household_weight"])
     df = df[df["broad_income"] > 0]
@@ -119,17 +129,23 @@ np.random.seed(RANDOM_SEED)
 net_of_tax = 1 - df_final["mtr"].values
 
 shock = np.random.lognormal(mean=0, sigma=0.025, size=len(df_final))
-net_of_tax_prime = (net_of_tax * shock).clip(0.01, 0.99)
+net_of_tax_prime = net_of_tax * shock
 mtr_prime = 1 - net_of_tax_prime
 
 mask = mtr_prime == df_final["mtr"].values
 while mask.any():
     shock[mask] = np.random.lognormal(mean=0, sigma=0.025, size=mask.sum())
-    net_of_tax_prime[mask] = (net_of_tax[mask] * shock[mask]).clip(0.01, 0.99)
+    net_of_tax_prime[mask] = net_of_tax[mask] * shock[mask]
     mtr_prime[mask] = 1 - net_of_tax_prime[mask]
     mask = mtr_prime == df_final["mtr"].values
 
 df_final["mtr_prime"] = mtr_prime
+
+# Trim mtr_prime to observed mtr range, then cut to exactly S rows
+mtr_min, mtr_max = df_final["mtr"].min(), df_final["mtr"].max()
+df_final = df_final[
+    (df_final["mtr_prime"] >= mtr_min) & (df_final["mtr_prime"] <= mtr_max)
+].iloc[:S]
 
 # ── Step 5: Summary statistics ─────────────────────────────────────────────
 print(f"\n{'='*45}")

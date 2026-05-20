@@ -116,11 +116,20 @@ df_final = pd.concat(all_samples, ignore_index=True)
 # R' is a small perturbation around R (MTR), representing a hypothetical
 # tax reform. Drawn from N(0, 0.025) and added to MTR.
 np.random.seed(RANDOM_SEED)
-net_of_tax = 1 - df_final["mtr"]
+net_of_tax = 1 - df_final["mtr"].values
+
 shock = np.random.lognormal(mean=0, sigma=0.025, size=len(df_final))
-net_of_tax_prime = (net_of_tax * shock).clip(0.01, 1.0)
-df_final["mtr_prime"] = 1 - net_of_tax_prime
-df_final = df_final[df_final["mtr"] != df_final["mtr_prime"]]
+net_of_tax_prime = (net_of_tax * shock).clip(0.01, 0.99)
+mtr_prime = 1 - net_of_tax_prime
+
+mask = mtr_prime == df_final["mtr"].values
+while mask.any():
+    shock[mask] = np.random.lognormal(mean=0, sigma=0.025, size=mask.sum())
+    net_of_tax_prime[mask] = (net_of_tax[mask] * shock[mask]).clip(0.01, 0.99)
+    mtr_prime[mask] = 1 - net_of_tax_prime[mask]
+    mask = mtr_prime == df_final["mtr"].values
+
+df_final["mtr_prime"] = mtr_prime
 
 # ── Step 5: Summary statistics ─────────────────────────────────────────────
 print(f"\n{'='*45}")

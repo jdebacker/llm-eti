@@ -81,7 +81,9 @@ for year, filename in YEARS.items():
     with h5py.File(tmp_path, "r+") as f:
         f["self_employment_income"][:] = f["self_employment_income"][:] + 1.0
     perturbed = Microsimulation(dataset=tmp_path)
-    se_mtr = perturbed.calculate("self_employment_tax", period=year).values - se_tax_base
+    se_mtr = (
+        perturbed.calculate("self_employment_tax", period=year).values - se_tax_base
+    )
     os.remove(tmp_path)
 
     mtr_person = (

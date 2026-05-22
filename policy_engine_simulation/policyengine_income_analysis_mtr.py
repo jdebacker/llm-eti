@@ -1,5 +1,6 @@
 # %%
 import os
+import shutil
 
 import h5py
 import numpy as np
@@ -36,7 +37,7 @@ for year, filename in YEARS.items():
 #   1. Load tax unit IDs and weights from h5
 #   2. Use PE's market_income (person-level) aggregated to tax unit for broad income
 #   3. Use PE's taxable_income (tax-unit level) directly — no aggregation needed
-#   4. Use PE's marginal_tax_rate (person-level) for highest earner per tax unit
+#   4. Sum federal + state + FICA + SE component MTRs (person-level) for highest earner per tax unit
 #   5. Expand rows by round(household_weight / 10), minimum 1
 #   6. Draw random sample of N_PER_YEAR rows
 
@@ -69,8 +70,26 @@ for year, filename in YEARS.items():
     # Taxable income: PE's TI is already at the tax unit level — use directly
     taxable_tu = baseline.calculate("taxable_income", period=year).values
 
-    # MTR: PE computes at person level — take MTR of highest earner per tax unit
-    mtr_person = baseline.calculate("marginal_tax_rate", period=year).values
+    # MTR: sum tax-only components (federal + state + FICA + SE tax) to exclude
+    # benefit cliffs/phase-outs that inflate PE's all-inclusive marginal_tax_rate.
+    # Aligns with Gruber-Saez (2002) which uses only income and payroll taxes.
+    # SE tax has no pre-computed marginal rate variable in PE, so we finite-difference
+    # self_employment_tax by bumping self_employment_income by $1 in a temp h5.
+    se_tax_base = baseline.calculate("self_employment_tax", period=year).values
+    tmp_path = path.replace(".h5", "_se_perturbed.h5")
+    shutil.copy2(path, tmp_path)
+    with h5py.File(tmp_path, "r+") as f:
+        f["self_employment_income"][:] = f["self_employment_income"][:] + 1.0
+    perturbed = Microsimulation(dataset=tmp_path)
+    se_mtr = perturbed.calculate("self_employment_tax", period=year).values - se_tax_base
+    os.remove(tmp_path)
+
+    mtr_person = (
+        baseline.calculate("federal_marginal_tax_rate", period=year).values
+        + baseline.calculate("state_marginal_tax_rate", period=year).values
+        + baseline.calculate("fica_marginal_tax_rate", period=year).values
+        + se_mtr
+    )
     mtr_tu = (
         pd.DataFrame(
             {

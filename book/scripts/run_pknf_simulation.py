@@ -19,6 +19,7 @@ ALL_MODELS = [
     "gpt-4o",
     "deepseek-ai/DeepSeek-V3",
     "claude-haiku-4-5-20251001",
+    "google/gemma-4-26B-A4B-it"
 ]
 
 

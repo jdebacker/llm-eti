@@ -67,56 +67,50 @@ class TaxSimulation:
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        try:
-            # Create scenario for EDSL
-            scenario = {
-                "broad_income": row["broad_income"],
-                "taxable_income": row["taxable_income"],
-                "mtr_last": row["mtr"],
-                "mtr_this": row["mtr_prime"],
-            }
+        # Create scenario for EDSL
+        scenario = {
+            "broad_income": row["broad_income"],
+            "taxable_income": row["taxable_income"],
+            "mtr_last": row["mtr"],
+            "mtr_this": row["mtr_prime"],
+        }
 
-            # Run survey with EDSL
-            results = self.client.run_batch_surveys(
-                [scenario],
-                n=self.params.responses_per_household,
-                survey_type="tax",
+        # Run survey with EDSL
+        results = self.client.run_batch_surveys(
+            [scenario],
+            n=self.params.responses_per_household,
+            survey_type="tax",
+        )
+
+        # Format results to match existing structure
+        formatted_results = []
+        for i, result in enumerate(results):
+            formatted_results.append(
+                {
+                    "timestamp": timestamp,
+                    "tax_unit_id": row.get("tax_unit_id"),
+                    "filing_status": row.get("filing_status"),
+                    "broad_income": row["broad_income"],
+                    "taxable_income": row["taxable_income"],
+                    "mtr": row["mtr"],
+                    "mtr_prime": row["mtr_prime"],
+                    "response_number": i + 1,
+                    "taxable_income_this": result.get("taxable_income_this"),
+                    "broad_income_this": result.get("broad_income_this"),
+                    "implied_eti_taxable": result.get("implied_eti_taxable"),
+                    "implied_eti_broad": result.get("implied_eti_broad"),
+                    "model": result.get("model", self.client.model),
+                    "income_response_raw": result.get("income_response_raw"),
+                }
             )
 
-            # Format results to match existing structure
-            formatted_results = []
-            for i, result in enumerate(results):
-                formatted_results.append(
-                    {
-                        "timestamp": timestamp,
-                        "tax_unit_id": row.get("tax_unit_id"),
-                        "filing_status": row.get("filing_status"),
-                        "broad_income": row["broad_income"],
-                        "taxable_income": row["taxable_income"],
-                        "mtr": row["mtr"],
-                        "mtr_prime": row["mtr_prime"],
-                        "response_number": i + 1,
-                        "taxable_income_this": result.get("taxable_income_this"),
-                        "broad_income_this": result.get("broad_income_this"),
-                        "implied_eti_taxable": result.get("implied_eti_taxable"),
-                        "implied_eti_broad": result.get("implied_eti_broad"),
-                        "model": result.get("model", self.client.model),
-                        "income_response_raw": result.get("income_response_raw"),
-                    }
-                )
-
-            return formatted_results
-
-        except Exception as e:
-            import traceback
-
-            print(
-                f"\nError in simulation for income {row['broad_income']}, rate {row['mtr_prime']}:"
+        if not formatted_results:
+            raise RuntimeError(
+                "Simulation produced no response rows "
+                f"for income {row['broad_income']} and rate {row['mtr_prime']}"
             )
-            print(f"Error type: {type(e).__name__}")
-            print(f"Error message: {str(e)}")
-            traceback.print_exc()
-            return []
+
+        return formatted_results
 
     def run_bulk_simulation(self, csv_path: Path) -> pd.DataFrame:
         """Run simulations for all households in the CSV.

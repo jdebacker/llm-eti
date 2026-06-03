@@ -335,6 +335,133 @@ TAXABLE_INCOME: <number>"""
             "taxable_income": parse_number(response_dict.get("taxable_income")),
         }
 
+    @staticmethod
+    def _is_truthy(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return value.strip().lower() in {"true", "1", "yes"}
+
+        try:
+            if value != value:
+                return False
+            return bool(value)
+        except (TypeError, ValueError):
+            return False
+
+    @classmethod
+    def _has_validated_answers(cls, df: Any) -> Optional[bool]:
+        validation_columns = [
+            column for column in df.columns if column.startswith("validated.")
+        ]
+        if not validation_columns:
+            return None
+
+        values = df[validation_columns].to_numpy().ravel()
+        return any(cls._is_truthy(value) for value in values)
+
+    def _get_edsl_run_details(self, results: Any) -> Dict[str, Any]:
+        details = {
+            "job_uuid": getattr(results, "job_uuid", None),
+            "results_uuid": getattr(results, "results_uuid", None),
+        }
+        job_uuid = details["job_uuid"]
+        if not job_uuid:
+            return details
+
+        try:
+            from edsl.coop import Coop
+
+            job_status = Coop(api_key=self.api_key).new_remote_inference_get(job_uuid)
+        except Exception as exc:
+            details["remote_status"] = f"unavailable ({type(exc).__name__}: {exc})"
+            return details
+
+        latest_details = job_status.get("latest_job_run_details", {}) or {}
+        interview_details = latest_details.get("interview_details", {}) or {}
+
+        details.update(
+            {
+                "remote_status": job_status.get("status"),
+                "failure_reason": latest_details.get("failure_reason"),
+                "failure_description": latest_details.get("failure_description"),
+                "error_report_url": latest_details.get("error_report_url"),
+                "total_interviews": interview_details.get("total_interviews"),
+                "completed_interviews": interview_details.get("completed_interviews"),
+                "interviews_with_exceptions": interview_details.get(
+                    "interviews_with_exceptions"
+                ),
+            }
+        )
+        return details
+
+    def _raise_if_no_usable_edsl_results(
+        self, df: Any, results: Any, survey_type: str, scenario: Dict[str, Any]
+    ) -> None:
+        if df.empty:
+            details = self._get_edsl_run_details(results)
+            raise RuntimeError(
+                self._format_edsl_failure_message(
+                    "EDSL returned an empty results table",
+                    details,
+                    survey_type,
+                    scenario,
+                    row_count=0,
+                )
+            )
+
+        has_validated_answers = self._has_validated_answers(df)
+        if has_validated_answers is not False:
+            return
+
+        details = self._get_edsl_run_details(results)
+        raise RuntimeError(
+            self._format_edsl_failure_message(
+                "EDSL returned no validated answers",
+                details,
+                survey_type,
+                scenario,
+                row_count=len(df),
+            )
+        )
+
+    def _format_edsl_failure_message(
+        self,
+        reason: str,
+        details: Dict[str, Any],
+        survey_type: str,
+        scenario: Dict[str, Any],
+        row_count: int,
+    ) -> str:
+        parts = [
+            reason,
+            f"survey_type={survey_type}",
+            f"model={self.model}",
+            f"rows={row_count}",
+        ]
+
+        for key in (
+            "job_uuid",
+            "results_uuid",
+            "remote_status",
+            "failure_reason",
+            "failure_description",
+            "total_interviews",
+            "completed_interviews",
+            "interviews_with_exceptions",
+            "error_report_url",
+        ):
+            value = details.get(key)
+            if value is not None:
+                parts.append(f"{key}={value}")
+
+        if "mtr_this" in scenario:
+            parts.append(f"mtr_this={scenario['mtr_this']}")
+        elif "round_num" in scenario:
+            parts.append(f"round_num={scenario['round_num']}")
+
+        return "; ".join(parts)
+
     def run_batch_surveys(
         self,
         scenarios: List[Dict[str, Any]],
@@ -375,6 +502,16 @@ TAXABLE_INCOME: <number>"""
             # Run all agents at once
             job = Jobs(survey=survey, agents=agents, models=[model])
             results = job.run(cache=self.use_cache)
+            if results is None:
+                raise RuntimeError(
+                    self._format_edsl_failure_message(
+                        "EDSL returned no Results object",
+                        {},
+                        survey_type,
+                        scenario,
+                        row_count=0,
+                    )
+                )
 
             # Extract results to DataFrame
             df = results.to_pandas()
@@ -388,6 +525,8 @@ TAXABLE_INCOME: <number>"""
                     f"edsl_output_{survey_type}_round{scenario.get('round_num', 'unknown')}.csv",
                     index=False,
                 )
+
+            self._raise_if_no_usable_edsl_results(df, results, survey_type, scenario)
 
             # Process each response
             if survey_type == "tax":

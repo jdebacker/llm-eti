@@ -284,6 +284,57 @@ TAXABLE_INCOME: <number>"""
 
         return results
 
+    @staticmethod
+    def _parse_income_response(raw_response: Any) -> Dict[str, Optional[float]]:
+        """Parse EDSL tax response payloads into expected income fields."""
+
+        def empty_response() -> Dict[str, Optional[float]]:
+            return {"broad_income": None, "taxable_income": None}
+
+        def parse_number(value: Any) -> Optional[float]:
+            if value is None or value is False or value is True:
+                return None
+            if isinstance(value, (int, float)):
+                return None if value != value else float(value)
+
+            value_text = str(value).strip()
+            if not value_text or value_text.lower() in {"nan", "none", "null"}:
+                return None
+
+            try:
+                return float(value_text.replace("$", "").replace(",", ""))
+            except ValueError:
+                return None
+
+        if raw_response is None:
+            return empty_response()
+
+        if isinstance(raw_response, float) and raw_response != raw_response:
+            return empty_response()
+
+        if isinstance(raw_response, dict):
+            response_dict = raw_response
+        else:
+            response_text = str(raw_response).strip()
+            if not response_text or response_text.lower() in {"nan", "none", "null"}:
+                return empty_response()
+
+            try:
+                response_dict = ast.literal_eval(response_text)
+            except (ValueError, SyntaxError):
+                return empty_response()
+
+        if not isinstance(response_dict, dict):
+            return empty_response()
+
+        if isinstance(response_dict.get("answer"), dict):
+            response_dict = response_dict["answer"]
+
+        return {
+            "broad_income": parse_number(response_dict.get("broad_income")),
+            "taxable_income": parse_number(response_dict.get("taxable_income")),
+        }
+
     def run_batch_surveys(
         self,
         scenarios: List[Dict[str, Any]],
@@ -311,7 +362,7 @@ TAXABLE_INCOME: <number>"""
 
             # Create multiple agents for batch processing
             agents = [
-                Agent(name=f"Respondent_{i+1}", instruction=agent_instruction)
+                Agent(name=f"Respondent_{i + 1}", instruction=agent_instruction)
                 for i in range(n)
             ]
 
@@ -342,15 +393,10 @@ TAXABLE_INCOME: <number>"""
             if survey_type == "tax":
                 for idx, row in df.iterrows():
                     result_dict = scenario.copy()
-                    try:
-                        income_response_dict = ast.literal_eval(
-                            row["answer.income_responses"]
-                        )
-                    except ValueError:
-                        income_response_dict = {
-                            "broad_income": None,
-                            "taxable_income": None,
-                        }
+                    income_response_raw = row.get("answer.income_responses")
+                    income_response_dict = self._parse_income_response(
+                        income_response_raw
+                    )
                     result_dict["broad_income_this"] = income_response_dict[
                         "broad_income"
                     ]
@@ -359,7 +405,7 @@ TAXABLE_INCOME: <number>"""
                     ]
                     result_dict["model"] = row.get("model.model", self.model)
                     # save income response in case need to parse later
-                    result_dict["income_response_raw"] = row["answer.income_responses"]
+                    result_dict["income_response_raw"] = income_response_raw
 
                     parsed_broad_income = income_response_dict["broad_income"]
                     parsed_table_income = income_response_dict["taxable_income"]
@@ -377,6 +423,7 @@ TAXABLE_INCOME: <number>"""
                         scenario["taxable_income"],
                         parsed_table_income,
                     )
+                    all_results.append(result_dict)
             else:  # lab experiment replication
                 for idx, row in df.iterrows():
                     result_dict = scenario.copy()

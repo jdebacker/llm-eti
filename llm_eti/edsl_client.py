@@ -474,6 +474,9 @@ Respond with exactly one JSON object and nothing else:
                 )
             )
 
+        if survey_type == "tax":
+            return
+
         has_validated_answers = self._has_validated_answers(df)
         if has_validated_answers is not False:
             return

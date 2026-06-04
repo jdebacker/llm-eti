@@ -7,11 +7,19 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 
 try:
-    from edsl import Agent, Jobs, Model, Question, QuestionNumerical, Survey
-    from edsl.questions import QuestionDict
+    from edsl import (
+        Agent,
+        Jobs,
+        Model,
+        Question,
+        QuestionFreeText,
+        QuestionNumerical,
+        Survey,
+    )
 except ImportError:
     # For testing without EDSL installed
     Question = Survey = Agent = Model = Jobs = None
+    QuestionFreeText = None
     QuestionNumerical = None
 
 
@@ -70,9 +78,8 @@ how much you work, your charitable contributions, retirement savings, or the
 timing of income realizations like capital gains. What would your broad
 income be this year? And what would your taxable income be?
 
-Respond with exactly two lines:
-BROAD_INCOME: <number>
-TAXABLE_INCOME: <number>"""
+Respond with exactly one JSON object and nothing else:
+{{"broad_income": <number or null>, "taxable_income": <number or null>}}"""
 
     def create_tax_survey(
         self,
@@ -94,17 +101,11 @@ TAXABLE_INCOME: <number>"""
         """
         prompt = self.build_prompt(broad_income, taxable_income, mtr_last, mtr_this)
 
-        # Will use QuestionDict so we can return two values in a structured way
-        # We can't set numerical bounds here, but can clean later
-        q = QuestionDict(
+        # Use free text so we can parse the model response ourselves and keep
+        # the numeric contract in local code instead of relying on QuestionDict.
+        q = QuestionFreeText(
             question_name="income_responses",
             question_text=prompt,
-            answer_keys=["broad_income", "taxable_income"],
-            value_types=[float, float],
-            value_descriptions=[
-                "Your estimate for broad income.",
-                "Your estimate for taxable income.",
-            ],
         )
 
         return Survey(questions=[q])
@@ -312,28 +313,74 @@ TAXABLE_INCOME: <number>"""
         if isinstance(raw_response, float) and raw_response != raw_response:
             return empty_response()
 
+        def parse_text_payload(response_text: str) -> Dict[str, Optional[float]]:
+            text = response_text.strip()
+            if not text or text.lower() in {"nan", "none", "null"}:
+                return empty_response()
+
+            # Strip code fences if the model wraps the answer in markdown.
+            if text.startswith("```"):
+                lines = text.splitlines()
+                if lines and lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                text = "\n".join(lines).strip()
+
+            candidate_dict = None
+            try:
+                candidate_dict = ast.literal_eval(text)
+            except (ValueError, SyntaxError):
+                try:
+                    import json
+
+                    candidate_dict = json.loads(text)
+                except Exception:
+                    candidate_dict = None
+
+            if isinstance(candidate_dict, dict):
+                if isinstance(candidate_dict.get("answer"), dict):
+                    candidate_dict = candidate_dict["answer"]
+                return {
+                    "broad_income": parse_number(candidate_dict.get("broad_income")),
+                    "taxable_income": parse_number(
+                        candidate_dict.get("taxable_income")
+                    ),
+                }
+
+            broad_income = None
+            taxable_income = None
+            for line in text.splitlines():
+                if ":" not in line:
+                    continue
+                key, value = line.split(":", 1)
+                key = key.strip().lower().replace(" ", "_")
+                value = value.strip()
+                if key in {"broad_income", "broadincome"}:
+                    broad_income = parse_number(value)
+                elif key in {"taxable_income", "taxableincome"}:
+                    taxable_income = parse_number(value)
+
+            return {
+                "broad_income": broad_income,
+                "taxable_income": taxable_income,
+            }
+
         if isinstance(raw_response, dict):
             response_dict = raw_response
-        else:
-            response_text = str(raw_response).strip()
-            if not response_text or response_text.lower() in {"nan", "none", "null"}:
-                return empty_response()
+            if isinstance(response_dict.get("answer"), dict):
+                response_dict = response_dict["answer"]
+            elif isinstance(response_dict.get("answer"), str):
+                return parse_text_payload(response_dict["answer"])
+            elif isinstance(response_dict.get("raw_model_response"), str):
+                return parse_text_payload(response_dict["raw_model_response"])
 
-            try:
-                response_dict = ast.literal_eval(response_text)
-            except (ValueError, SyntaxError):
-                return empty_response()
+            return {
+                "broad_income": parse_number(response_dict.get("broad_income")),
+                "taxable_income": parse_number(response_dict.get("taxable_income")),
+            }
 
-        if not isinstance(response_dict, dict):
-            return empty_response()
-
-        if isinstance(response_dict.get("answer"), dict):
-            response_dict = response_dict["answer"]
-
-        return {
-            "broad_income": parse_number(response_dict.get("broad_income")),
-            "taxable_income": parse_number(response_dict.get("taxable_income")),
-        }
+        return parse_text_payload(str(raw_response))
 
     @staticmethod
     def _is_truthy(value: Any) -> bool:
@@ -533,8 +580,19 @@ TAXABLE_INCOME: <number>"""
                 for idx, row in df.iterrows():
                     result_dict = scenario.copy()
                     income_response_raw = row.get("answer.income_responses")
+                    raw_model_response = row.get(
+                        "raw_model_response.income_responses_raw_model_response"
+                    )
                     income_response_dict = self._parse_income_response(
                         income_response_raw
+                        if income_response_raw is not None
+                        and str(income_response_raw).strip().lower()
+                        not in {
+                            "nan",
+                            "none",
+                            "null",
+                        }
+                        else raw_model_response
                     )
                     result_dict["broad_income_this"] = income_response_dict[
                         "broad_income"
@@ -545,9 +603,21 @@ TAXABLE_INCOME: <number>"""
                     result_dict["model"] = row.get("model.model", self.model)
                     # save income response in case need to parse later
                     result_dict["income_response_raw"] = income_response_raw
+                    result_dict["raw_model_response"] = raw_model_response
 
                     parsed_broad_income = income_response_dict["broad_income"]
                     parsed_table_income = income_response_dict["taxable_income"]
+                    if parsed_broad_income is None or parsed_table_income is None:
+                        raise RuntimeError(
+                            self._format_edsl_failure_message(
+                                "EDSL tax response did not contain two numeric incomes",
+                                self._get_edsl_run_details(results),
+                                survey_type,
+                                scenario,
+                                row_count=len(df),
+                            )
+                            + f"; answer={income_response_raw}; raw_model_response={raw_model_response}"
+                        )
 
                     # Calculate ETI for tax surveys
                     result_dict["implied_eti_broad"] = self.calculate_eti(

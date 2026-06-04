@@ -2,6 +2,7 @@
 
 import ast
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -307,6 +308,17 @@ Respond with exactly one JSON object and nothing else:
             except ValueError:
                 return None
 
+        def extract_field(text: str, field_name: str) -> Optional[float]:
+            pattern = re.compile(
+                rf'"?{re.escape(field_name)}"?\s*:\s*'
+                r"(?P<value>null|-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)",
+                re.IGNORECASE,
+            )
+            match = pattern.search(text)
+            if not match:
+                return None
+            return parse_number(match.group("value"))
+
         if raw_response is None:
             return empty_response()
 
@@ -360,6 +372,11 @@ Respond with exactly one JSON object and nothing else:
                     broad_income = parse_number(value)
                 elif key in {"taxable_income", "taxableincome"}:
                     taxable_income = parse_number(value)
+
+            if broad_income is None:
+                broad_income = extract_field(text, "broad_income")
+            if taxable_income is None:
+                taxable_income = extract_field(text, "taxable_income")
 
             return {
                 "broad_income": broad_income,

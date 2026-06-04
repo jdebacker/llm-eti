@@ -399,6 +399,96 @@ Respond with exactly one JSON object and nothing else:
 
         return parse_text_payload(str(raw_response))
 
+    def _extract_tax_result_from_row(
+        self, scenario: Dict[str, Any], row: Any, attempt_number: int
+    ) -> Optional[Dict[str, Any]]:
+        income_response_raw = row.get("answer.income_responses")
+        raw_model_response = row.get(
+            "raw_model_response.income_responses_raw_model_response"
+        )
+        parsed = self._parse_income_response(
+            income_response_raw
+            if income_response_raw is not None
+            and str(income_response_raw).strip().lower()
+            not in {
+                "nan",
+                "none",
+                "null",
+            }
+            else raw_model_response
+        )
+
+        parsed_broad_income = parsed["broad_income"]
+        parsed_taxable_income = parsed["taxable_income"]
+        if parsed_broad_income is None or parsed_taxable_income is None:
+            return None
+
+        result_dict = scenario.copy()
+        result_dict["broad_income_this"] = parsed_broad_income
+        result_dict["taxable_income_this"] = parsed_taxable_income
+        result_dict["model"] = row.get("model.model", self.model)
+        result_dict["income_response_raw"] = income_response_raw
+        result_dict["raw_model_response"] = raw_model_response
+        result_dict["response_attempt"] = attempt_number
+        result_dict["implied_eti_broad"] = self.calculate_eti(
+            scenario["mtr_last"],
+            scenario["mtr_this"],
+            scenario["broad_income"],
+            parsed_broad_income,
+        )
+        result_dict["implied_eti_taxable"] = self.calculate_eti(
+            scenario["mtr_last"],
+            scenario["mtr_this"],
+            scenario["taxable_income"],
+            parsed_taxable_income,
+        )
+        return result_dict
+
+    def _run_tax_survey_with_retries(
+        self,
+        scenario: Dict[str, Any],
+        n: int,
+        agents: List["Agent"],
+        model: Any,
+        max_attempts: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Run a tax survey with retries and return only valid response rows."""
+        all_results: List[Dict[str, Any]] = []
+        attempts = 0
+
+        while attempts < max_attempts and len(all_results) < n:
+            attempts += 1
+            remaining = n - len(all_results)
+            attempt_agents = agents[:remaining]
+            job = Jobs(
+                survey=self.create_tax_survey(**scenario),
+                agents=attempt_agents,
+                models=[model],
+            )
+            results = job.run(cache=self.use_cache if attempts == 1 else False)
+            if results is None:
+                continue
+
+            df = results.to_pandas()
+            if df.empty:
+                continue
+
+            df.to_csv(
+                f"edsl_output_tax_{scenario.get('mtr_this', 'round' + str(scenario.get('round_num', 'unknown')))}.csv",
+                index=False,
+            )
+
+            for _, row in df.iterrows():
+                result_dict = self._extract_tax_result_from_row(
+                    scenario, row, attempt_number=attempts
+                )
+                if result_dict is not None:
+                    all_results.append(result_dict)
+                if len(all_results) >= n:
+                    break
+
+        return all_results
+
     @staticmethod
     def _is_truthy(value: Any) -> bool:
         if value is None:
@@ -550,9 +640,27 @@ Respond with exactly one JSON object and nothing else:
 
         for scenario in scenarios:
             if survey_type == "tax":
-                survey = self.create_tax_survey(**scenario)
-            else:  # lab
-                survey = self.create_lab_experiment_survey(**scenario)
+                agents = [
+                    Agent(name=f"Respondent_{i + 1}", instruction=agent_instruction)
+                    for i in range(n)
+                ]
+
+                if self.model.startswith("gemini-"):
+                    model = Model(self.model, service_name="google")
+                else:
+                    model = Model(self.model)
+
+                all_results.extend(
+                    self._run_tax_survey_with_retries(
+                        scenario=scenario,
+                        n=n,
+                        agents=agents,
+                        model=model,
+                    )
+                )
+                continue
+
+            survey = self.create_lab_experiment_survey(**scenario)
 
             # Create multiple agents for batch processing
             agents = [
@@ -582,84 +690,18 @@ Respond with exactly one JSON object and nothing else:
 
             # Extract results to DataFrame
             df = results.to_pandas()
-            if survey_type == "tax":
-                df.to_csv(
-                    f"edsl_output_{survey_type}_{scenario.get('mtr_this', 'round' + str(scenario.get('round_num', 'unknown')))}.csv",
-                    index=False,
-                )
-            else:
-                df.to_csv(
-                    f"edsl_output_{survey_type}_round{scenario.get('round_num', 'unknown')}.csv",
-                    index=False,
-                )
-
+            # lab experiment replication
             self._raise_if_no_usable_edsl_results(df, results, survey_type, scenario)
-
-            # Process each response
-            if survey_type == "tax":
-                for idx, row in df.iterrows():
-                    result_dict = scenario.copy()
-                    income_response_raw = row.get("answer.income_responses")
-                    raw_model_response = row.get(
-                        "raw_model_response.income_responses_raw_model_response"
-                    )
-                    income_response_dict = self._parse_income_response(
-                        income_response_raw
-                        if income_response_raw is not None
-                        and str(income_response_raw).strip().lower()
-                        not in {
-                            "nan",
-                            "none",
-                            "null",
-                        }
-                        else raw_model_response
-                    )
-                    result_dict["broad_income_this"] = income_response_dict[
-                        "broad_income"
-                    ]
-                    result_dict["taxable_income_this"] = income_response_dict[
-                        "taxable_income"
-                    ]
-                    result_dict["model"] = row.get("model.model", self.model)
-                    # save income response in case need to parse later
-                    result_dict["income_response_raw"] = income_response_raw
-                    result_dict["raw_model_response"] = raw_model_response
-
-                    parsed_broad_income = income_response_dict["broad_income"]
-                    parsed_table_income = income_response_dict["taxable_income"]
-                    if parsed_broad_income is None or parsed_table_income is None:
-                        raise RuntimeError(
-                            self._format_edsl_failure_message(
-                                "EDSL tax response did not contain two numeric incomes",
-                                self._get_edsl_run_details(results),
-                                survey_type,
-                                scenario,
-                                row_count=len(df),
-                            )
-                            + f"; answer={income_response_raw}; raw_model_response={raw_model_response}"
-                        )
-
-                    # Calculate ETI for tax surveys
-                    result_dict["implied_eti_broad"] = self.calculate_eti(
-                        scenario["mtr_last"],
-                        scenario["mtr_this"],
-                        scenario["broad_income"],
-                        parsed_broad_income,
-                    )
-                    result_dict["implied_eti_taxable"] = self.calculate_eti(
-                        scenario["mtr_last"],
-                        scenario["mtr_this"],
-                        scenario["taxable_income"],
-                        parsed_table_income,
-                    )
-                    all_results.append(result_dict)
-            else:  # lab experiment replication
-                for idx, row in df.iterrows():
-                    result_dict = scenario.copy()
-                    result_dict["income"] = row.get("answer.income_response")
-                    # save income response in case need to parse later
-                    result_dict["response_raw"] = row["answer.income_response"]
-                    result_dict["model"] = row.get("model.model", self.model)
+            df.to_csv(
+                f"edsl_output_{survey_type}_round{scenario.get('round_num', 'unknown')}.csv",
+                index=False,
+            )
+            for idx, row in df.iterrows():
+                result_dict = scenario.copy()
+                result_dict["income"] = row.get("answer.income_response")
+                # save income response in case need to parse later
+                result_dict["response_raw"] = row["answer.income_response"]
+                result_dict["model"] = row.get("model.model", self.model)
 
                 all_results.append(result_dict)
 

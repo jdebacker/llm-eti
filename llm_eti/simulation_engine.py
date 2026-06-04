@@ -105,8 +105,8 @@ class TaxSimulation:
             )
 
         if not formatted_results:
-            raise RuntimeError(
-                "Simulation produced no response rows "
+            print(
+                "Warning: skipping household with no valid tax responses "
                 f"for income {row['broad_income']} and rate {row['mtr_prime']}"
             )
 

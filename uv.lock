@@ -614,7 +614,7 @@ wheels = [
 
 [[package]]
 name = "edsl"
-version = "1.0.8"
+version = "1.0.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -633,9 +633,9 @@ dependencies = [
     { name = "tenacity" },
     { name = "typer", extra = ["all"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/83/3f/d4baade4c2f8c62e9b742737eea7a4d5d37b9db5593840bdce640f5a095d/edsl-1.0.8.tar.gz", hash = "sha256:04067dca8f74512e429663a898e54b3f4ee274d9037231a47d0b3bdf3d26357d", size = 1270524, upload-time = "2026-05-08T17:10:07.016Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/a0/05bed7c9ee7c217dfbec60456a389ff6afb9de00c6c244d53ac8cec946fa/edsl-1.0.7.tar.gz", hash = "sha256:97ceea296f237cafcd4ddd8b972a019f378a365bdd02c92c6d79027bc49e8de3", size = 1264536, upload-time = "2026-04-29T18:51:33.447Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e7/51/3dc61bc337165c3776b30263099011472d4b100274e4fd484e740b5da04a/edsl-1.0.8-py3-none-any.whl", hash = "sha256:be45dd4a301738000a8afbf97913514392880b2d35a8a55438a4120f243aa2ae", size = 1601190, upload-time = "2026-05-08T17:10:05.142Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/e3/4e3a1c2f7e87ca24368e21f710e90248afcc9c86a6cafb89d640e772b8f7/edsl-1.0.7-py3-none-any.whl", hash = "sha256:c4b5f32d0137333e953509a30b619f233df5c53a77d07b6c7c815a2f446c891a", size = 1594227, upload-time = "2026-04-29T18:51:31.272Z" },
 ]
 
 [[package]]
@@ -1321,7 +1321,7 @@ dev = [
 requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
     { name = "click", specifier = ">=8.1.0" },
-    { name = "edsl" },
+    { name = "edsl", specifier = "==1.0.7" },
     { name = "greenlet", specifier = ">=3.1.0" },
     { name = "jupyter-book", specifier = ">=0.15.0" },
     { name = "matplotlib", specifier = ">=3.9.0" },

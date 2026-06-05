@@ -65,7 +65,7 @@ class EDSLClient:
         mtr_last_pct = int(mtr_last * 100)
         mtr_this_pct = int(mtr_this * 100)
 
-        return f"""You are a taxpayer with the following profile:
+        prompt = f"""You are a taxpayer with the following profile:
 - Last year, your broad income was ${broad_income:,.0f}
 - Last year, your taxable income was ${taxable_income:,.0f}
 - Last year, your marginal tax rate was {mtr_last_pct}%
@@ -81,6 +81,15 @@ income be this year? And what would your taxable income be?
 
 Respond with exactly one JSON object and nothing else:
 {{"broad_income": <number or null>, "taxable_income": <number or null>}}"""
+
+        model_name = self.model.lower()
+        if "deepseek" in model_name or "claude" in model_name:
+            prompt += (
+                "\n\nDo not use null. Return your best numeric estimates even if "
+                "approximate. Use whole-dollar amounts."
+            )
+
+        return prompt
 
     def create_tax_survey(
         self,

@@ -1,9 +1,12 @@
 """EDSL client for running LLM surveys."""
 
 import ast
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from dotenv import load_dotenv
 
@@ -255,9 +258,9 @@ Respond with exactly one JSON object and nothing else:
             + f"You can earn an income of {labor_endowment * wage_per_unit:.0f}"
             + " cents. \n"
             + "Please indicate whether you want to work for "
-            + f"{labor_endowment * wage_per_unit:.0f} cents or another income: \n"
-            # + "Number of text sequences for this chosen income: "
-            # + {chosen_labor} + "\n"  NOTE: This is in original instructions, but not sure how work with LLM
+            + f"{labor_endowment * wage_per_unit:.0f} cents or another income. "
+            + "Reply with a single integer number of cents (e.g. 340). "
+            + "Do not include any text, units, or explanation — only the number.\n"
         )
 
         question = QuestionNumerical(
@@ -628,6 +631,144 @@ Respond with exactly one JSON object and nothing else:
 
         return "; ".join(parts)
 
+    @staticmethod
+    def _parse_lab_income_response(row: Any) -> Optional[float]:
+        """Extract a numeric income value from a lab experiment result row.
+
+        Tries the validated answer first, then falls back to the raw model
+        response, applying string-to-number coercion (strip $, commas, etc.)
+        and a regex scan for the first number in the string.
+        """
+
+        def try_float(value: Any) -> Optional[float]:
+            if value is None:
+                return None
+            try:
+                val = float(str(value).strip().replace("$", "").replace(",", ""))
+                return None if val != val else val  # guard NaN
+            except (TypeError, ValueError):
+                return None
+
+        # Primary: validated/parsed answer from QuestionNumerical
+        answer = row.get("answer.income_response")
+        parsed = try_float(answer)
+        if parsed is not None:
+            return parsed
+
+        # Fallback: raw model response text
+        raw = row.get("raw_model_response.income_response_raw_model_response")
+        if raw is not None:
+            raw_str = str(raw).strip()
+            parsed = try_float(raw_str)
+            if parsed is not None:
+                return parsed
+            # Last resort: find the first integer/decimal in the string
+            match = re.search(r"-?\d+(?:\.\d+)?", raw_str)
+            if match:
+                return try_float(match.group())
+
+        return None
+
+    def _run_lab_survey_with_retries(
+        self,
+        scenario: Dict[str, Any],
+        n: int,
+        agents: List["Agent"],
+        model: Any,
+        max_attempts: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Run a lab survey with retries, returning n result dicts.
+
+        Retries up to max_attempts times to collect n valid (numeric) responses.
+        If fewer than n valid responses are obtained after all attempts, failure
+        records (income=None, parse_failed=True) are appended so the caller
+        always receives exactly n records.
+        """
+        all_results: List[Dict[str, Any]] = []
+        attempts = 0
+        last_raw = None
+
+        while attempts < max_attempts and len(all_results) < n:
+            attempts += 1
+            remaining = n - len(all_results)
+            attempt_agents = agents[:remaining]
+
+            survey = self.create_lab_experiment_survey(**scenario)
+            job = Jobs(survey=survey, agents=attempt_agents, models=[model])
+            results = job.run(cache=self.use_cache if attempts == 1 else False)
+
+            if results is None:
+                logger.warning(
+                    "Lab survey returned no Results object "
+                    "(round=%s, attempt=%d/%d)",
+                    scenario.get("round_num"),
+                    attempts,
+                    max_attempts,
+                )
+                continue
+
+            df = results.to_pandas()
+            if df.empty:
+                logger.warning(
+                    "Lab survey returned empty DataFrame "
+                    "(round=%s, attempt=%d/%d)",
+                    scenario.get("round_num"),
+                    attempts,
+                    max_attempts,
+                )
+                continue
+
+            df.to_csv(
+                f"edsl_output_lab_round{scenario.get('round_num', 'unknown')}.csv",
+                index=False,
+            )
+
+            for _, row in df.iterrows():
+                raw = row.get("answer.income_response")
+                last_raw = raw
+                income = self._parse_lab_income_response(row)
+
+                if income is not None:
+                    result_dict = scenario.copy()
+                    result_dict["income"] = income
+                    result_dict["response_raw"] = raw
+                    result_dict["model"] = row.get("model.model", self.model)
+                    result_dict["response_attempt"] = attempts
+                    result_dict["parse_failed"] = False
+                    all_results.append(result_dict)
+                else:
+                    logger.warning(
+                        "Non-numeric income from lab response "
+                        "(round=%s, attempt=%d/%d, raw=%r)",
+                        scenario.get("round_num"),
+                        attempts,
+                        max_attempts,
+                        raw,
+                    )
+
+                if len(all_results) >= n:
+                    break
+
+        # Pad with failure records if we couldn't collect n valid results
+        if len(all_results) < n:
+            logger.error(
+                "Lab survey: only %d/%d valid results after %d attempts (round=%s)",
+                len(all_results),
+                n,
+                attempts,
+                scenario.get("round_num"),
+            )
+            for _ in range(n - len(all_results)):
+                failure_dict = scenario.copy()
+                failure_dict["income"] = None
+                failure_dict["response_raw"] = last_raw
+                failure_dict["model"] = self.model
+                failure_dict["response_attempt"] = attempts
+                failure_dict["parse_failed"] = True
+                all_results.append(failure_dict)
+
+        return all_results
+
     def run_batch_surveys(
         self,
         scenarios: List[Dict[str, Any]],
@@ -669,8 +810,6 @@ Respond with exactly one JSON object and nothing else:
                 )
                 continue
 
-            survey = self.create_lab_experiment_survey(**scenario)
-
             # Create multiple agents for batch processing
             agents = [
                 Agent(name=f"Respondent_{i + 1}", instruction=agent_instruction)
@@ -683,36 +822,14 @@ Respond with exactly one JSON object and nothing else:
             else:
                 model = Model(self.model)
 
-            # Run all agents at once
-            job = Jobs(survey=survey, agents=agents, models=[model])
-            results = job.run(cache=self.use_cache)
-            if results is None:
-                raise RuntimeError(
-                    self._format_edsl_failure_message(
-                        "EDSL returned no Results object",
-                        {},
-                        survey_type,
-                        scenario,
-                        row_count=0,
-                    )
+            all_results.extend(
+                self._run_lab_survey_with_retries(
+                    scenario=scenario,
+                    n=n,
+                    agents=agents,
+                    model=model,
                 )
-
-            # Extract results to DataFrame
-            df = results.to_pandas()
-            # lab experiment replication
-            self._raise_if_no_usable_edsl_results(df, results, survey_type, scenario)
-            df.to_csv(
-                f"edsl_output_{survey_type}_round{scenario.get('round_num', 'unknown')}.csv",
-                index=False,
             )
-            for idx, row in df.iterrows():
-                result_dict = scenario.copy()
-                result_dict["income"] = row.get("answer.income_response")
-                # save income response in case need to parse later
-                result_dict["response_raw"] = row["answer.income_response"]
-                result_dict["model"] = row.get("model.model", self.model)
-
-                all_results.append(result_dict)
 
         return all_results
 

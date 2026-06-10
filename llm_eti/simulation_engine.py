@@ -187,67 +187,86 @@ class LabExperimentSimulation:
         )
         all_results = []
 
-        for treatment_label in treatments:
-            try:
-                treatment = Treatment.from_label(treatment_label)
-            except ValueError:
-                print(f"Warning: Unknown treatment '{treatment_label}', skipping")
-                continue
+        total_sims = len(treatments) * subjects_per_treatment * rounds
+        with tqdm(total=total_sims, desc="Lab experiment") as pbar:
+            for treatment_label in treatments:
+                try:
+                    treatment = Treatment.from_label(treatment_label)
+                except ValueError:
+                    print(f"Warning: Unknown treatment '{treatment_label}', skipping")
+                    pbar.update(rounds * subjects_per_treatment)
+                    continue
 
-            for subject_id in range(subjects_per_treatment):
-                # Random labor endowments for each round
-                labor_endowments = np.random.randint(
-                    int(self.config["labor_endowment_min"]),
-                    int(self.config["labor_endowment_max"]) + 1,
-                    size=rounds,
-                )
-
-                for round_idx in range(rounds):
-                    round_num = round_idx + 1  # 1-based round number
-
-                    # Get tax schedule for this round
-                    schedule = treatment.get_schedule_for_round(round_num, rounds)
-
-                    scenario = {
-                        "round_num": round_num,
-                        "tax_schedule": schedule.value,
-                        "labor_endowment": int(labor_endowments[round_idx]),
-                        "wage_per_unit": self.config["wage_per_unit"],
-                        "rounds": rounds,
-                        "low_rate": low_rate,
-                        "high_rate": high_rate,
-                    }
-
-                    # Run survey
-                    results = self.client.run_batch_surveys(
-                        [scenario],
-                        n=1,
-                        survey_type="lab",
-                        agent_instruction=instructions,
+                for subject_id in range(subjects_per_treatment):
+                    # Random labor endowments for each round
+                    labor_endowments = np.random.randint(
+                        int(self.config["labor_endowment_min"]),
+                        int(self.config["labor_endowment_max"]) + 1,
+                        size=rounds,
                     )
 
-                    if results:
-                        result = results[0]
-                        income_choice = result.get("income", 0)
-
-                        # Relabel treatment to reflect actual rates used
-                        output_label = treatment.label.replace(
-                            "Flat25", f"Flat{int(low_rate)}"
-                        ).replace("Flat50", f"Flat{int(high_rate)}")
-
-                        all_results.append(
-                            {
-                                "treatment": output_label,
-                                "subject_id": subject_id,
-                                "round": round_num,
-                                "tax_schedule": schedule.value,
-                                "labor_endowment": labor_endowments[round_idx],
-                                "labor_supply": income_choice
-                                / self.config["wage_per_unit"],
-                                "income": income_choice,
-                                "post_reform": round_num > rounds // 2,
-                                "model": result.get("model", self.client.model),
-                            }
+                    for round_idx in range(rounds):
+                        round_num = round_idx + 1  # 1-based round number
+                        completed = pbar.n
+                        remaining = total_sims - completed
+                        pbar.set_description(
+                            f"Treatment {treatment_label} | "
+                            f"Subject {subject_id + 1}/{subjects_per_treatment} | "
+                            f"Round {round_num}/{rounds} | "
+                            f"{remaining} remaining"
                         )
+
+                        # Get tax schedule for this round
+                        schedule = treatment.get_schedule_for_round(round_num, rounds)
+
+                        scenario = {
+                            "round_num": round_num,
+                            "tax_schedule": schedule.value,
+                            "labor_endowment": int(labor_endowments[round_idx]),
+                            "wage_per_unit": self.config["wage_per_unit"],
+                            "rounds": rounds,
+                            "low_rate": low_rate,
+                            "high_rate": high_rate,
+                        }
+
+                        # Run survey
+                        results = self.client.run_batch_surveys(
+                            [scenario],
+                            n=1,
+                            survey_type="lab",
+                            agent_instruction=instructions,
+                        )
+
+                        if results:
+                            result = results[0]
+                            income_choice = result.get("income")
+
+                            # Relabel treatment to reflect actual rates used
+                            output_label = treatment.label.replace(
+                                "Flat25", f"Flat{int(low_rate)}"
+                            ).replace("Flat50", f"Flat{int(high_rate)}")
+
+                            all_results.append(
+                                {
+                                    "treatment": output_label,
+                                    "subject_id": subject_id,
+                                    "round": round_num,
+                                    "tax_schedule": schedule.value,
+                                    "labor_endowment": labor_endowments[round_idx],
+                                    "labor_supply": (
+                                        income_choice / self.config["wage_per_unit"]
+                                        if income_choice is not None
+                                        else None
+                                    ),
+                                    "income": income_choice,
+                                    "post_reform": round_num > rounds // 2,
+                                    "model": result.get("model", self.client.model),
+                                    "response_error": result.get(
+                                        "parse_failed", False
+                                    ),
+                                }
+                            )
+
+                        pbar.update(1)
 
         return pd.DataFrame(all_results)

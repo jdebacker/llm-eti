@@ -4,6 +4,7 @@ import ast
 import logging
 import os
 import re
+import time
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -456,6 +457,42 @@ Respond with exactly one JSON object and nothing else:
         )
         return result_dict
 
+    def _run_job_with_server_retry(
+        self,
+        job: Any,
+        use_cache: bool,
+        max_server_retries: int = 5,
+        base_wait: float = 30.0,
+    ) -> Any:
+        """Run an EDSL job with exponential backoff for transient server errors (5xx)."""
+        for attempt in range(max_server_retries):
+            try:
+                return job.run(cache=use_cache)
+            except Exception as exc:
+                exc_name = type(exc).__name__
+                exc_str = str(exc)
+                is_server_error = (
+                    "CoopServerResponseError" in exc_name
+                    or any(code in exc_str for code in ("502", "503", "504", "Bad gateway"))
+                )
+                if is_server_error and attempt < max_server_retries - 1:
+                    wait = base_wait * (2**attempt)
+                    logger.warning(
+                        "Server error on attempt %d/%d, retrying in %.0fs: %s",
+                        attempt + 1,
+                        max_server_retries,
+                        wait,
+                        exc,
+                    )
+                    print(
+                        f"\n⚠️  Server error (attempt {attempt + 1}/{max_server_retries}), "
+                        f"retrying in {wait:.0f}s..."
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
+        return None  # unreachable
+
     def _run_tax_survey_with_retries(
         self,
         scenario: Dict[str, Any],
@@ -477,7 +514,18 @@ Respond with exactly one JSON object and nothing else:
                 agents=attempt_agents,
                 models=[model],
             )
-            results = job.run(cache=self.use_cache if attempts == 1 else False)
+            try:
+                results = self._run_job_with_server_retry(
+                    job, use_cache=self.use_cache if attempts == 1 else False
+                )
+            except Exception as exc:
+                logger.error(
+                    "Tax survey failed after server retries (attempt=%d/%d): %s",
+                    attempts,
+                    max_attempts,
+                    exc,
+                )
+                continue
             if results is None:
                 continue
 
@@ -695,7 +743,20 @@ Respond with exactly one JSON object and nothing else:
 
             survey = self.create_lab_experiment_survey(**scenario)
             job = Jobs(survey=survey, agents=attempt_agents, models=[model])
-            results = job.run(cache=self.use_cache if attempts == 1 else False)
+            try:
+                results = self._run_job_with_server_retry(
+                    job, use_cache=self.use_cache if attempts == 1 else False
+                )
+            except Exception as exc:
+                logger.error(
+                    "Lab survey failed after server retries "
+                    "(round=%s, attempt=%d/%d): %s",
+                    scenario.get("round_num"),
+                    attempts,
+                    max_attempts,
+                    exc,
+                )
+                continue
 
             if results is None:
                 logger.warning(

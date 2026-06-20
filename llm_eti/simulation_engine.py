@@ -164,6 +164,7 @@ class LabExperimentSimulation:
         subjects_per_treatment: int = 100,
         low_rate: float = 25.0,
         high_rate: float = 50.0,
+        checkpoint_path: Optional[Path] = None,
     ) -> pd.DataFrame:
         """Run the full lab experiment simulation.
 
@@ -185,7 +186,27 @@ class LabExperimentSimulation:
         instructions = self.client.create_instructions_text(
             rounds=rounds, wage_per_unit=self.config["wage_per_unit"]
         )
-        all_results = []
+
+        # Load checkpoint if it exists
+        all_results: List[Dict] = []
+        completed_set: set = set()
+        if checkpoint_path is not None and Path(checkpoint_path).exists():
+            try:
+                existing_df = pd.read_csv(checkpoint_path)
+                if not existing_df.empty:
+                    all_results = existing_df.to_dict("records")
+                    for row in all_results:
+                        completed_set.add(
+                            (str(row["treatment"]), int(row["subject_id"]), int(row["round"]))
+                        )
+                    print(
+                        f"Resuming from checkpoint: {len(all_results)} results loaded "
+                        f"({len(completed_set)} (treatment, subject, round) tuples completed)"
+                    )
+            except Exception as e:
+                print(f"Warning: Could not load checkpoint {checkpoint_path}: {e}")
+                all_results = []
+                completed_set = set()
 
         total_sims = len(treatments) * subjects_per_treatment * rounds
         with tqdm(total=total_sims, desc="Lab experiment") as pbar:
@@ -197,9 +218,16 @@ class LabExperimentSimulation:
                     pbar.update(rounds * subjects_per_treatment)
                     continue
 
+                # Compute output label once per treatment (doesn't vary by round)
+                output_label = treatment.label.replace(
+                    "Flat25", f"Flat{int(low_rate)}"
+                ).replace("Flat50", f"Flat{int(high_rate)}")
+
                 for subject_id in range(subjects_per_treatment):
-                    # Random labor endowments for each round
-                    labor_endowments = np.random.randint(
+                    # Deterministic seed per (treatment, subject) for reproducible endowments
+                    seed = abs(hash(treatment_label)) % (2**32) + subject_id
+                    rng = np.random.default_rng(seed)
+                    labor_endowments = rng.integers(
                         int(self.config["labor_endowment_min"]),
                         int(self.config["labor_endowment_max"]) + 1,
                         size=rounds,
@@ -207,6 +235,12 @@ class LabExperimentSimulation:
 
                     for round_idx in range(rounds):
                         round_num = round_idx + 1  # 1-based round number
+
+                        # Skip rounds already saved to checkpoint
+                        if (output_label, subject_id, round_num) in completed_set:
+                            pbar.update(1)
+                            continue
+
                         completed = pbar.n
                         remaining = total_sims - completed
                         pbar.set_description(
@@ -241,31 +275,35 @@ class LabExperimentSimulation:
                             result = results[0]
                             income_choice = result.get("income")
 
-                            # Relabel treatment to reflect actual rates used
-                            output_label = treatment.label.replace(
-                                "Flat25", f"Flat{int(low_rate)}"
-                            ).replace("Flat50", f"Flat{int(high_rate)}")
+                            row_data = {
+                                "treatment": output_label,
+                                "subject_id": subject_id,
+                                "round": round_num,
+                                "tax_schedule": schedule.value,
+                                "labor_endowment": int(labor_endowments[round_idx]),
+                                "labor_supply": (
+                                    income_choice / self.config["wage_per_unit"]
+                                    if income_choice is not None
+                                    else None
+                                ),
+                                "income": income_choice,
+                                "post_reform": round_num > rounds // 2,
+                                "model": result.get("model", self.client.model),
+                                "response_error": result.get("parse_failed", False),
+                            }
+                            all_results.append(row_data)
+                            completed_set.add((output_label, subject_id, round_num))
 
-                            all_results.append(
-                                {
-                                    "treatment": output_label,
-                                    "subject_id": subject_id,
-                                    "round": round_num,
-                                    "tax_schedule": schedule.value,
-                                    "labor_endowment": labor_endowments[round_idx],
-                                    "labor_supply": (
-                                        income_choice / self.config["wage_per_unit"]
-                                        if income_choice is not None
-                                        else None
-                                    ),
-                                    "income": income_choice,
-                                    "post_reform": round_num > rounds // 2,
-                                    "model": result.get("model", self.client.model),
-                                    "response_error": result.get(
-                                        "parse_failed", False
-                                    ),
-                                }
-                            )
+                            # Append to checkpoint immediately so progress survives crashes
+                            if checkpoint_path is not None:
+                                checkpoint_df = pd.DataFrame([row_data])
+                                write_header = not Path(checkpoint_path).exists()
+                                checkpoint_df.to_csv(
+                                    checkpoint_path,
+                                    mode="a",
+                                    header=write_header,
+                                    index=False,
+                                )
 
                         pbar.update(1)
 

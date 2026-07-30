@@ -87,7 +87,7 @@ Respond with exactly one JSON object and nothing else:
 {{"broad_income": <number or null>, "taxable_income": <number or null>}}"""
 
         model_name = self.model.lower()
-        if "deepseek" in model_name or "claude" in model_name:
+        if "deepseek" in model_name or "claude" in model_name or "gpt-4o" in model_name:
             prompt += (
                 "\n\nDo not use null. Return your best numeric estimates even if "
                 "approximate. Use whole-dollar amounts."

@@ -197,7 +197,11 @@ class LabExperimentSimulation:
                     all_results = existing_df.to_dict("records")
                     for row in all_results:
                         completed_set.add(
-                            (str(row["treatment"]), int(row["subject_id"]), int(row["round"]))
+                            (
+                                str(row["treatment"]),
+                                int(row["subject_id"]),
+                                int(row["round"]),
+                            )
                         )
                     print(
                         f"Resuming from checkpoint: {len(all_results)} results loaded "

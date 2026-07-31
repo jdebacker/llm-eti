@@ -471,9 +471,8 @@ Respond with exactly one JSON object and nothing else:
             except Exception as exc:
                 exc_name = type(exc).__name__
                 exc_str = str(exc)
-                is_server_error = (
-                    "CoopServerResponseError" in exc_name
-                    or any(code in exc_str for code in ("502", "503", "504", "Bad gateway"))
+                is_server_error = "CoopServerResponseError" in exc_name or any(
+                    code in exc_str for code in ("502", "503", "504", "Bad gateway")
                 )
                 if is_server_error and attempt < max_server_retries - 1:
                     wait = base_wait * (2**attempt)
@@ -771,8 +770,7 @@ Respond with exactly one JSON object and nothing else:
             df = results.to_pandas()
             if df.empty:
                 logger.warning(
-                    "Lab survey returned empty DataFrame "
-                    "(round=%s, attempt=%d/%d)",
+                    "Lab survey returned empty DataFrame " "(round=%s, attempt=%d/%d)",
                     scenario.get("round_num"),
                     attempts,
                     max_attempts,

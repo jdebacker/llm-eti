@@ -74,7 +74,7 @@ LABOR_THRESHOLD = 20
 
 # PKNF (2024) paper Table 5 values: fraction choosing labor <= threshold, by treatment and pre/post
 PKNF_TABLE5 = {
-    "Prog,Prog":   {"Pre": 0.78, "Post": 0.81},
+    "Prog,Prog": {"Pre": 0.78, "Post": 0.81},
     "Prog,Flat25": {"Pre": 0.88, "Post": 0.46},
     "Prog,Flat50": {"Pre": 0.83, "Post": 0.54},
     "Flat25,Prog": {"Pre": 0.53, "Post": 0.79},
@@ -89,16 +89,22 @@ MODEL_DISPLAY_NAMES = {
     "deepseek-ai_DeepSeek-V3": "DeepSeek V3",
     "google_gemma-4-26B-A4B-it": "Gemma 4",
 }
-MODEL_COLUMN_ORDER = ["GPT-4o", "GPT-4o-mini", "Claude Haiku 4.5", "DeepSeek V3", "Gemma 4"]
+MODEL_COLUMN_ORDER = [
+    "GPT-4o",
+    "GPT-4o-mini",
+    "Claude Haiku 4.5",
+    "DeepSeek V3",
+    "Gemma 4",
+]
 
 # Bar colors for cross-model figures: PKNF gets gray, each LLM gets a distinct color
 BAR_COLORS = {
-    "PKNF":              "#555555",
-    "GPT-4o":            "#4472C4",
-    "GPT-4o-mini":       "#70B0E0",
-    "Claude Haiku 4.5":  "#ED7D31",
-    "DeepSeek V3":       "#70AD47",
-    "Gemma 4":           "#9B59B6",
+    "PKNF": "#555555",
+    "GPT-4o": "#4472C4",
+    "GPT-4o-mini": "#70B0E0",
+    "Claude Haiku 4.5": "#ED7D31",
+    "DeepSeek V3": "#70AD47",
+    "Gemma 4": "#9B59B6",
 }
 
 # Preferred legend order matching PKNF Figure 4
@@ -114,7 +120,7 @@ TREATMENT_ORDER = [
 
 # Treatment colors matched to PKNF Figure 4
 TREATMENT_COLORS = {
-    "Prog,Prog": "#4472C4",    # blue
+    "Prog,Prog": "#4472C4",  # blue
     "Prog,Flat25": "#ED7D31",  # orange
     "Prog,Flat40": "#BF9000",  # gold (40pct analog of Flat50)
     "Prog,Flat50": "#BF9000",  # gold/tan
@@ -155,7 +161,7 @@ def parse_filename(csv_path: Path) -> tuple[str, float, float]:
     Uses rsplit to handle model names that contain underscores (e.g., google_gemma-...).
     """
     stem = csv_path.stem  # e.g., "pknf_results_gpt-4o-mini_25pct_50pct"
-    rest = stem[len("pknf_results_"):]  # e.g., "gpt-4o-mini_25pct_50pct"
+    rest = stem[len("pknf_results_") :]  # e.g., "gpt-4o-mini_25pct_50pct"
     parts = rest.rsplit("_", 2)  # ["gpt-4o-mini", "25pct", "50pct"]
     model = parts[0]
     flat_rate = float(parts[1].replace("pct", "")) / 100
@@ -193,15 +199,23 @@ def make_table5(df: pd.DataFrame, out_prefix: str, treatments: list[str]) -> Non
         .mean()
         .reset_index()
     )
-    table5 = table5.pivot(index="treatment", columns="Post", values="labor_20").reset_index()
-    table5 = table5.rename(columns={"treatment": "Treatment", 0: "Pre-Reform", 1: "Post-Reform"})
+    table5 = table5.pivot(
+        index="treatment", columns="Post", values="labor_20"
+    ).reset_index()
+    table5 = table5.rename(
+        columns={"treatment": "Treatment", 0: "Pre-Reform", 1: "Post-Reform"}
+    )
 
     # Preserve treatment order and filter to what's in the data
     ordered = [t for t in treatments if t in table5["Treatment"].values]
     table5 = table5.set_index("Treatment").loc[ordered].reset_index()
 
-    table5.to_markdown(TABLES_DIR / f"{out_prefix}_table5.md", floatfmt=".2f", index=False)
-    table5.to_latex(TABLES_DIR / f"{out_prefix}_table5.tex", float_format="%.2f", index=False)
+    table5.to_markdown(
+        TABLES_DIR / f"{out_prefix}_table5.md", floatfmt=".2f", index=False
+    )
+    table5.to_latex(
+        TABLES_DIR / f"{out_prefix}_table5.tex", float_format="%.2f", index=False
+    )
     print(f"  Saved Table 5 -> {out_prefix}_table5.{{md,tex}}")
 
 
@@ -249,7 +263,9 @@ def make_figure2(df: pd.DataFrame, out_prefix: str, treatments: list[str]) -> No
                     )
         mean_val = df_bar[df_bar["treatment"] == treat]["labor"].mean()
         max_val = df_bar[df_bar["treatment"] == treat]["labor"].max()
-        ax.axhline(y=mean_val, color="#808080", linestyle="--", linewidth=1.5, alpha=0.8)
+        ax.axhline(
+            y=mean_val, color="#808080", linestyle="--", linewidth=1.5, alpha=0.8
+        )
         ax.set_xlabel("Maximum Labor")
         ax.set_ylabel("Labor Supply, in Units")
         ax.set_title(treat)
@@ -385,8 +401,10 @@ def calculate_bunching_eti(
     # --- Mass inside the dominated region ---
     # Rational agents should never be here; any mass indicates irrational / noisy behavior.
     prog_in_dom = (
-        (prog_inc > notch_income) & (prog_inc < dominated_top)
-    ).mean() if n_prog > 0 else np.nan
+        ((prog_inc > notch_income) & (prog_inc < dominated_top)).mean()
+        if n_prog > 0
+        else np.nan
+    )
 
     # --- Mass above the dominated region (only when observable) ---
     if can_observe_above:
@@ -404,9 +422,8 @@ def calculate_bunching_eti(
     # Point estimate: fraction at exactly z* (may be zero).
     # Window estimate: average fraction per income bin in [z*-W, z*+W].
     if counterfactual_window is not None and n_flat > 0:
-        in_window = (
-            (flat_inc >= notch_income - counterfactual_window)
-            & (flat_inc <= notch_income + counterfactual_window)
+        in_window = (flat_inc >= notch_income - counterfactual_window) & (
+            flat_inc <= notch_income + counterfactual_window
         )
         n_bins_in_window = 2 * counterfactual_window / wage_rate + 1
         flat_counterfactual_density = in_window.mean() / n_bins_in_window
@@ -513,9 +530,8 @@ def bootstrap_bunching_eti(
 
     # Counterfactual density
     if counterfactual_window is not None:
-        in_win = (
-            (flat_boot >= notch_income - counterfactual_window)
-            & (flat_boot <= notch_income + counterfactual_window)
+        in_win = (flat_boot >= notch_income - counterfactual_window) & (
+            flat_boot <= notch_income + counterfactual_window
         )
         n_bins = 2 * counterfactual_window / wage_rate + 1
         flat_density = in_win.mean(axis=1) / n_bins
@@ -570,17 +586,24 @@ def make_bunching_eti_table(
     top_str = f"{int(top_rate * 100)}pct"
     out_prefix = f"pknf_all_models_{flat_str}_{top_str}"
 
-    model_lookup = {MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs}
+    model_lookup = {
+        MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs
+    }
     rows = {}
     for display_name in MODEL_COLUMN_ORDER:
         if display_name not in model_lookup:
             continue
         df = model_lookup[display_name]
         point = calculate_bunching_eti(
-            df, top_rate, low_rate=flat_rate, counterfactual_window=counterfactual_window
+            df,
+            top_rate,
+            low_rate=flat_rate,
+            counterfactual_window=counterfactual_window,
         )
         boot = bootstrap_bunching_eti(
-            df, top_rate, low_rate=flat_rate,
+            df,
+            top_rate,
+            low_rate=flat_rate,
             counterfactual_window=counterfactual_window,
             n_bootstrap=n_bootstrap,
         )
@@ -645,7 +668,9 @@ def make_eti_summary_table(
     top_str = f"{int(top_rate * 100)}pct"
     out_prefix = f"pknf_all_models_{flat_str}_{top_str}"
 
-    model_lookup = {MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs}
+    model_lookup = {
+        MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs
+    }
 
     # Gather point estimates and bootstrap CIs for each model
     results = {}
@@ -654,10 +679,15 @@ def make_eti_summary_table(
             continue
         df = model_lookup[display_name]
         point = calculate_bunching_eti(
-            df, top_rate, low_rate=flat_rate, counterfactual_window=counterfactual_window
+            df,
+            top_rate,
+            low_rate=flat_rate,
+            counterfactual_window=counterfactual_window,
         )
         boot = bootstrap_bunching_eti(
-            df, top_rate, low_rate=flat_rate,
+            df,
+            top_rate,
+            low_rate=flat_rate,
             counterfactual_window=counterfactual_window,
             n_bootstrap=n_bootstrap,
         )
@@ -685,9 +715,7 @@ def make_eti_summary_table(
         # CI row (blank model name, dashes for structural since it has no CI)
         model_col.append("")
         lb_col.append("")
-        dd_col.append(
-            f"[{ci_low:.3f}, {ci_high:.3f}]" if not np.isnan(ci_low) else ""
-        )
+        dd_col.append(f"[{ci_low:.3f}, {ci_high:.3f}]" if not np.isnan(ci_low) else "")
 
     table = pd.DataFrame(
         {"Model": model_col, col_lb: lb_col, col_dd: dd_col}
@@ -736,8 +764,12 @@ def make_regression_tables(
     inc_results = {}
 
     for treat in treated:
-        lab_results[treat] = _format_reg_col(_run_did_regression(df, treat, "lab_supply"))
-        inc_results[treat] = _format_reg_col(_run_did_regression(df, treat, "log_income"))
+        lab_results[treat] = _format_reg_col(
+            _run_did_regression(df, treat, "lab_supply")
+        )
+        inc_results[treat] = _format_reg_col(
+            _run_did_regression(df, treat, "log_income")
+        )
 
     # Table 6 (labor supply share)
     reg_df = pd.DataFrame(lab_results, index=REG_INDEX)
@@ -751,7 +783,9 @@ def make_regression_tables(
             {"PKNF": PKNF_TABLE6_COL1, "LLM": reg_df["Prog,Flat25"]},
             index=REG_INDEX,
         )
-        compare_df.to_markdown(TABLES_DIR / f"{out_prefix}_table6_compare.md", index=True)
+        compare_df.to_markdown(
+            TABLES_DIR / f"{out_prefix}_table6_compare.md", index=True
+        )
         compare_df.to_latex(TABLES_DIR / f"{out_prefix}_table6_compare.tex", index=True)
         print(f"  Saved Table 6 comparison -> {out_prefix}_table6_compare.{{md,tex}}")
 
@@ -766,7 +800,9 @@ def make_regression_tables(
     for treat in treated:
         divisor = get_eti_divisor(treat, top_rate)
         if divisor is not None:
-            post_treat_coef = float(inc_results[treat][4])  # index 4 = Post*Treated estimate
+            post_treat_coef = float(
+                inc_results[treat][4]
+            )  # index 4 = Post*Treated estimate
             eti[treat] = post_treat_coef / divisor
 
     if eti:
@@ -802,7 +838,9 @@ def make_bunching_figure(df: pd.DataFrame, out_prefix: str) -> None:
     ax.set_xlabel("Pre-tax Income")
     ax.set_ylabel("Density")
     ax.legend()
-    fig.savefig(FIGURES_DIR / f"{out_prefix}_bunching.png", bbox_inches="tight", dpi=300)
+    fig.savefig(
+        FIGURES_DIR / f"{out_prefix}_bunching.png", bbox_inches="tight", dpi=300
+    )
     plt.close(fig)
     print(f"  Saved bunching figure -> {out_prefix}_bunching.png")
 
@@ -835,21 +873,24 @@ def make_cross_model_table5(
 
     # PKNF paper columns (50pct only)
     if abs(top_rate - 0.50) < 0.01:
-        col_data["PKNF Pre"] = {t: PKNF_TABLE5.get(t, {}).get("Pre", float("nan"))
-                                for t in ordered_treatments}
-        col_data["PKNF Post"] = {t: PKNF_TABLE5.get(t, {}).get("Post", float("nan"))
-                                 for t in ordered_treatments}
+        col_data["PKNF Pre"] = {
+            t: PKNF_TABLE5.get(t, {}).get("Pre", float("nan"))
+            for t in ordered_treatments
+        }
+        col_data["PKNF Post"] = {
+            t: PKNF_TABLE5.get(t, {}).get("Post", float("nan"))
+            for t in ordered_treatments
+        }
 
     # LLM model columns in preferred order
-    model_lookup = {MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs}
+    model_lookup = {
+        MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs
+    }
     for display_name in MODEL_COLUMN_ORDER:
         if display_name not in model_lookup:
             continue
         df = model_lookup[display_name]
-        means = (
-            df.groupby(["treatment", "Post"])["labor_20"]
-            .mean()
-        )
+        means = df.groupby(["treatment", "Post"])["labor_20"].mean()
         col_data[f"{display_name} Pre"] = {
             t: means.get((t, 0), float("nan")) for t in ordered_treatments
         }
@@ -895,18 +936,24 @@ def make_cross_model_bar_figure(
     # PKNF paper values (50pct top rate only)
     if abs(top_rate - 0.50) < 0.01:
         sources_pre["PKNF"] = {
-            t: PKNF_TABLE5.get(t, {}).get("Pre", float("nan")) for t in ordered_treatments
+            t: PKNF_TABLE5.get(t, {}).get("Pre", float("nan"))
+            for t in ordered_treatments
         }
         sources_post["PKNF"] = {
-            t: PKNF_TABLE5.get(t, {}).get("Post", float("nan")) for t in ordered_treatments
+            t: PKNF_TABLE5.get(t, {}).get("Post", float("nan"))
+            for t in ordered_treatments
         }
 
     # LLM models in the table column order
-    model_lookup = {MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs}
+    model_lookup = {
+        MODEL_DISPLAY_NAMES.get(label, label): df for label, df in model_dfs
+    }
     for display_name in MODEL_COLUMN_ORDER:
         if display_name not in model_lookup:
             continue
-        means = model_lookup[display_name].groupby(["treatment", "Post"])["labor_20"].mean()
+        means = (
+            model_lookup[display_name].groupby(["treatment", "Post"])["labor_20"].mean()
+        )
         sources_pre[display_name] = {
             t: means.get((t, 0), float("nan")) for t in ordered_treatments
         }
@@ -914,7 +961,9 @@ def make_cross_model_bar_figure(
             t: means.get((t, 1), float("nan")) for t in ordered_treatments
         }
 
-    all_sources = list(sources_pre.keys())  # PKNF first (if present), then LLMs in order
+    all_sources = list(
+        sources_pre.keys()
+    )  # PKNF first (if present), then LLMs in order
     n_groups = len(ordered_treatments)
     n_bars = len(all_sources)
     bar_width = 0.8 / n_bars
@@ -984,13 +1033,17 @@ def make_cross_model_table6(
         result_cols[display_name] = _format_reg_col(res)
 
     if not result_cols:
-        print(f"  Skipping cross-model table for {flat_str}/{top_str}: no data for {treatment}")
+        print(
+            f"  Skipping cross-model table for {flat_str}/{top_str}: no data for {treatment}"
+        )
         return
 
     # Order columns: PKNF first (if present), then models in preferred order
-    ordered_cols = (["PKNF"] if "PKNF" in result_cols else []) + [
-        m for m in MODEL_COLUMN_ORDER if m in result_cols
-    ] + [m for m in result_cols if m not in MODEL_COLUMN_ORDER and m != "PKNF"]
+    ordered_cols = (
+        (["PKNF"] if "PKNF" in result_cols else [])
+        + [m for m in MODEL_COLUMN_ORDER if m in result_cols]
+        + [m for m in result_cols if m not in MODEL_COLUMN_ORDER and m != "PKNF"]
+    )
     table = pd.DataFrame({c: result_cols[c] for c in ordered_cols}, index=REG_INDEX)
     table.to_markdown(TABLES_DIR / f"{out_prefix}_table6_compare.md", index=True)
     table.to_latex(TABLES_DIR / f"{out_prefix}_table6_compare.tex", index=True)

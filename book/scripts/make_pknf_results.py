@@ -415,8 +415,10 @@ def calculate_bunching_eti(
         prog_above = flat_above = missing_mass = np.nan
 
     # --- ETI lower bound (structural) ---
-    delta_log_ntr = np.log((1 - low_rate) / (1 - top_rate))
-    eti_lower_bound = (delta_z_star / notch_income) / delta_log_ntr
+    # Kleven & Waseem (2013, QJE) equation 12:
+    # e = (Δz*/z*)² / ((τ_H - τ_L) / (1 - τ_H))
+    kw_denominator = (top_rate - low_rate) / (1 - top_rate)
+    eti_lower_bound = (delta_z_star / notch_income) ** 2 / kw_denominator
 
     # --- Counterfactual density at z* from flat schedule ---
     # Point estimate: fraction at exactly z* (may be zero).
@@ -441,7 +443,7 @@ def calculate_bunching_eti(
         implied_delta_z = min(
             (excess_bunching / flat_counterfactual_density) * wage_rate, delta_z_star
         )
-        eti_estimate = (implied_delta_z / notch_income) / delta_log_ntr
+        eti_estimate = (implied_delta_z / notch_income) ** 2 / kw_denominator
     else:
         eti_estimate = np.nan
 
@@ -501,7 +503,7 @@ def bootstrap_bunching_eti(
     """
     notch_labor = notch_income / wage_rate
     delta_z_star = notch_income * (top_rate - low_rate) / (1 - top_rate)
-    delta_log_ntr = np.log((1 - low_rate) / (1 - top_rate))
+    kw_denominator = (top_rate - low_rate) / (1 - top_rate)
 
     df_elig = df[df["max_labor"] > notch_labor]
     prog_inc = df_elig[df_elig["tax_schedule"] == "progressive"]["income"].to_numpy()
@@ -545,7 +547,7 @@ def bootstrap_bunching_eti(
             np.minimum((excess / flat_density) * wage_rate, delta_z_star),
             np.nan,
         )
-    eti_boot = (implied_dz / notch_income) / delta_log_ntr
+    eti_boot = (implied_dz / notch_income) ** 2 / kw_denominator
 
     valid = eti_boot[~np.isnan(eti_boot)]
     if len(valid) == 0:

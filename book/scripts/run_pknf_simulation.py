@@ -47,6 +47,8 @@ def main():
         default=50.0,
         help="High marginal tax rate as a percentage (default: 50)",
     )
+    parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--max-in-flight", type=int, default=1)
     args = parser.parse_args()
 
     # Check for API key
@@ -95,6 +97,8 @@ def main():
         print(f"  - Cache enabled: {client.use_cache}")
         print(f"  - Low rate: {args.low_rate}%")
         print(f"  - High rate: {args.high_rate}%")
+        print(f"  - Batch size: {args.batch_size}")
+        print(f"  - Max in-flight jobs: {args.max_in_flight}")
 
         # Determine output path (checkpoint and final output share the same file)
         output_dir = Path(__file__).parent.parent / "data"
@@ -122,6 +126,8 @@ def main():
             low_rate=args.low_rate,
             high_rate=args.high_rate,
             checkpoint_path=output_path,
+            batch_size=args.batch_size,
+            max_in_flight=args.max_in_flight,
         )
 
         # Final save (consolidates any in-memory-only rows; safe to re-run)

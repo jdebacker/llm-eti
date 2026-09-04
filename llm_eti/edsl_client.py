@@ -20,11 +20,12 @@ try:
         Question,
         QuestionFreeText,
         QuestionNumerical,
+        Scenario,
         Survey,
     )
 except ImportError:
     # For testing without EDSL installed
-    Question = Survey = Agent = Model = Jobs = None
+    Question = Survey = Agent = Model = Jobs = Scenario = None
     QuestionFreeText = None
     QuestionNumerical = None
 
@@ -893,6 +894,7 @@ Respond with exactly one JSON object and nothing else:
         max_in_flight: int = 1,
         fresh: bool = True,
         on_submit: Optional[Callable[[List[Dict[str, Any]], Any], None]] = None,
+        on_chunk_complete: Optional[Callable[[List[Dict[str, Any]]], None]] = None,
     ) -> List[Dict[str, Any]]:
         """Execute scenario chunks as bounded concurrent remote EDSL jobs.
 
@@ -916,24 +918,59 @@ Respond with exactly one JSON object and nothing else:
         agent = Agent(name="Batched respondent", instruction=agent_instruction)
 
         def submit_and_fetch(chunk: List[Dict[str, Any]]) -> Any:
-            job = Jobs(
-                survey=survey,
-                agents=[agent],
-                models=[self._make_model()],
-                scenarios=chunk,
-            )
-            pending = job.run(
-                cache=False if fresh else self.use_cache,
-                fresh=fresh,
-                disable_remote_cache=fresh,
-                background=True,
-                remote_inference_description=(
-                    f"llm-eti {survey_type} batch ({len(chunk)} scenarios)"
-                ),
-            )
+            """Submit once, then tolerate temporary connection loss while polling."""
+            pending = None
+            for attempt in range(1, 5):
+                try:
+                    job = Jobs(
+                        survey=survey,
+                        agents=[agent],
+                        models=[self._make_model()],
+                        scenarios=[Scenario(scenario) for scenario in chunk],
+                    )
+                    pending = job.run(
+                        cache=False if fresh else self.use_cache,
+                        fresh=fresh,
+                        disable_remote_cache=fresh,
+                        background=True,
+                        remote_inference_description=(
+                            f"llm-eti {survey_type} batch ({len(chunk)} scenarios)"
+                        ),
+                    )
+                    break
+                except Exception as exc:
+                    if attempt == 4:
+                        raise
+                    wait_seconds = 5 * (2 ** (attempt - 1))
+                    logger.warning(
+                        "Remote %s batch submission failed (%s); retrying in %ss "
+                        "(%s/4)",
+                        survey_type,
+                        type(exc).__name__,
+                        wait_seconds,
+                        attempt,
+                    )
+                    time.sleep(wait_seconds)
+
             if on_submit is not None:
                 on_submit(chunk, pending)
-            return pending.fetch(polling_interval=2.0)
+
+            for attempt in range(1, 5):
+                try:
+                    return pending.fetch(polling_interval=2.0)
+                except Exception as exc:
+                    if attempt == 4:
+                        raise
+                    wait_seconds = 5 * (2 ** (attempt - 1))
+                    logger.warning(
+                        "Remote %s batch polling failed (%s); retrying in %ss (%s/4)",
+                        survey_type,
+                        type(exc).__name__,
+                        wait_seconds,
+                        attempt,
+                    )
+                    time.sleep(wait_seconds)
+            raise AssertionError("unreachable")
 
         results: List[Dict[str, Any]] = []
         chunks = iter(self._chunks(scenarios, batch_size))
@@ -957,6 +994,7 @@ Respond with exactly one JSON object and nothing else:
                             f"Remote {survey_type} batch failed for {len(chunk)} scenarios"
                         ) from exc
                     scenario_by_id = {str(s["work_id"]): s for s in chunk}
+                    chunk_results: List[Dict[str, Any]] = []
                     for _, row in df.iterrows():
                         scenario = scenario_by_id.get(str(row.get("scenario.work_id")))
                         if scenario is None:
@@ -971,6 +1009,7 @@ Respond with exactly one JSON object and nothing else:
                                     int(row.get("iteration.iteration", 0)) + 1
                                 )
                                 results.append(parsed)
+                                chunk_results.append(parsed)
                         else:
                             income = self._parse_lab_income_response(row)
                             if (
@@ -994,6 +1033,9 @@ Respond with exactly one JSON object and nothing else:
                                 }
                             )
                             results.append(parsed)
+                            chunk_results.append(parsed)
+                    if on_chunk_complete is not None:
+                        on_chunk_complete(chunk_results)
                     try:
                         next_chunk = next(chunks)
                     except StopIteration:

@@ -305,6 +305,35 @@ class LabExperimentSimulation:
                         }
                     )
 
+        def format_result(result: Dict) -> Dict:
+            income_choice = result.get("income")
+            return {
+                "treatment": result["treatment"],
+                "subject_id": result["subject_id"],
+                "round": result["round"],
+                "tax_schedule": result["tax_schedule"],
+                "labor_endowment": result["labor_endowment"],
+                "labor_supply": (
+                    income_choice / result["wage_per_unit"]
+                    if income_choice is not None
+                    else None
+                ),
+                "income": income_choice,
+                "post_reform": result["round"] > rounds // 2,
+                "model": result.get("model", self.client.model),
+                "response_error": result.get("parse_failed", False),
+            }
+
+        def checkpoint_chunk(chunk_results: List[Dict]) -> None:
+            if checkpoint_path is None or not chunk_results:
+                return
+            pd.DataFrame([format_result(result) for result in chunk_results]).to_csv(
+                checkpoint_path,
+                mode="a",
+                header=not Path(checkpoint_path).exists(),
+                index=False,
+            )
+
         raw_results = self.client.run_batched_surveys(
             scenarios,
             survey_type="lab",
@@ -312,31 +341,10 @@ class LabExperimentSimulation:
             batch_size=batch_size,
             max_in_flight=max_in_flight,
             fresh=True,
+            on_chunk_complete=checkpoint_chunk,
         )
         for result in raw_results:
-            income_choice = result.get("income")
-            row_data = {
-                "treatment": result["treatment"],
-                "subject_id": result["subject_id"],
-                "round": result["round"],
-                "tax_schedule": result["tax_schedule"],
-                "labor_endowment": result["labor_endowment"],
-                "labor_supply": income_choice / result["wage_per_unit"]
-                if income_choice is not None
-                else None,
-                "income": income_choice,
-                "post_reform": result["round"] > rounds // 2,
-                "model": result.get("model", self.client.model),
-                "response_error": result.get("parse_failed", False),
-            }
+            row_data = format_result(result)
             all_results.append(row_data)
-            if checkpoint_path is not None:
-                checkpoint_df = pd.DataFrame([row_data])
-                checkpoint_df.to_csv(
-                    checkpoint_path,
-                    mode="a",
-                    header=not Path(checkpoint_path).exists(),
-                    index=False,
-                )
 
         return pd.DataFrame(all_results)
